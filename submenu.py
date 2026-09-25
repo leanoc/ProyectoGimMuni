@@ -51,7 +51,10 @@ def submenu_commissions():
     print("--- COMISIONES Y VACANTES ---")
     commissions = operations.get_all_commissions()
     for c in commissions:
-        print(f"ID: {c[0]} | Código: {c[1]} | Ocupación: {c[6]}/{c[2]} | Cupo Titulares: {c[3]} | Curso: {c[4]}")
+        print(
+            f"ID: {c[0]} | Código: {c[1]} | Inscriptos: {c[6]}/{c[2]} "
+            f"| Admitidos: {c[7]}/{c[3]} | En espera: {c[8]} | Curso: {c[4]}"
+        )
     input("\nPresione Enter para volver...")
 
 def submenu_persons():
@@ -61,6 +64,7 @@ def submenu_persons():
         print("--- GESTIÓN DE PERSONAS ---")
         print("1. Listar personas")
         print("2. Registrar nueva persona e inscribir")
+        print("3. Dar de baja a una persona admitida")
         print("0. Volver al menú principal")
         opt = input("\nSeleccione una opción: ").strip()
 
@@ -76,6 +80,12 @@ def submenu_persons():
 
         elif opt == "2":
             clear_screen()
+            comms = operations.get_all_commissions()
+            if not comms:
+                print("No hay comisiones disponibles para realizar una inscripción.")
+                input("\nPresione Enter para continuar...")
+                continue
+
             print("--- ALTA DE PERSONA ---")
             dni = prompt_input("DNI (7 u 8 dígitos): ", validators.validate_dni, "DNI inválido.")
             nombre = prompt_input("Nombre: ", validators.validate_not_empty, "El nombre no puede estar vacío.")
@@ -96,25 +106,48 @@ def submenu_persons():
             telefono = prompt_input("Teléfono: ", validators.validate_not_empty, "El teléfono no puede estar vacío.")
             email = prompt_input("Email: ", validators.validate_email, "Email no válido.")
 
-            try:
-                operations.insert_person(dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email)
-                print("\nPersona registrada en el padrón con éxito.")
+            print("\n--- Comisiones Disponibles ---")
+            for c in comms:
+                print(
+                    f"[{c[0]}] {c[1]} - Curso: {c[4]} "
+                    f"(Inscriptos: {c[6]}/{c[2]}, admitidos: {c[7]}/{c[3]}, "
+                    f"en espera: {c[8]})"
+                )
 
-                person = operations.get_person_by_dni(dni)
-                if person:
-                    p_id = person[0][0]
-                    print("\n--- Comisiones Disponibles ---")
-                    comms = operations.get_all_commissions()
-                    for c in comms:
-                        print(f"[{c[0]}] {c[1]} - Curso: {c[4]} (Ocupación: {c[6]}/{c[2]})")
-                    
-                    choice = input("\nIngrese ID de comisión para inscribir (o 0 para omitir): ").strip()
-                    if choice.isdigit() and int(choice) > 0:
-                        ok, msg = operations.register_applicant(p_id, int(choice))
-                        print(f"\n[{'EXITO' if ok else 'RECHAZADO'}] {msg}")
+            commission_ids = {str(c[0]) for c in comms}
+            choice = input("\nIngrese el ID de la comisión para inscribir: ").strip()
+            while choice not in commission_ids:
+                print("  -> Error: Seleccione una comisión disponible.")
+                choice = input("Ingrese el ID de la comisión para inscribir: ").strip()
 
-            except Exception as e:
-                print(f"\nError durante la operación: {e}")
+            ok, msg = operations.register_new_applicant(
+                dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email, int(choice)
+            )
+            print(f"\n[{'EXITO' if ok else 'RECHAZADO'}] {msg}")
+
+            input("\nPresione Enter para continuar...")
+
+        elif opt == "3":
+            clear_screen()
+            dni = prompt_input("DNI de la persona admitida: ", validators.validate_dni, "DNI inválido.")
+            admitted = operations.get_admitted_registration_by_dni(dni)
+            if not admitted:
+                print("\nNo se encontró una inscripción admitida para ese DNI.")
+            else:
+                record = admitted[0]
+                print(
+                    f"\nPersona: {record[1]} {record[2]} | Curso: {record[3]} "
+                    f"| Comisión: {record[4]} | Inscripción: {record[5]}"
+                )
+                confirmation = input(
+                    "\nLa baja eliminará también los datos de la persona. "
+                    "¿Confirma la operación? (SI/no): "
+                ).strip().lower()
+                if confirmation == "si":
+                    ok, msg = operations.deregister_admitted_applicant(dni)
+                    print(f"\n[{'EXITO' if ok else 'RECHAZADO'}] {msg}")
+                else:
+                    print("\nBaja cancelada.")
 
             input("\nPresione Enter para continuar...")
 

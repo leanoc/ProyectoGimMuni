@@ -6,9 +6,11 @@ El sistema incluye validaciones de edad, control de duplicados y adjudicación d
 
 ## 🚀 Características Principales
 
-- **Gestión de Inscripciones:** Registro de personas con validación estricta de DNI, edad mínima (configurable) y formato de correo electrónico.
+- **Gestión de Inscripciones:** Alta de personas e inscripción a una comisión en una única operación; si la inscripción no se confirma, la persona no se guarda. Incluye validación estricta de DNI, edad mínima (configurable) y formato de correo electrónico.
 - **Control de Cupos Dinámico:** Verificación en tiempo real de la disponibilidad de cupos por comisión y por curso general.
 - **Regla de Inscripción Única:** El sistema bloquea automáticamente los intentos de inscripción a múltiples cursos por una misma persona.
+- **Bajas y reemplazos:** Al dar de baja a una persona admitida, se elimina su inscripción y sus datos; el siguiente inscripto pendiente por fecha y hora ocupa el lugar dentro de la misma comisión.
+- **Estado de comisiones:** El panel distingue inscriptos totales, personas admitidas sobre el cupo de titulares y personas en espera.
 - **Algoritmos de Adjudicación:**
   - *Natación:* Asignación de vacantes mediante sorteo aleatorio automatizado.
   - *Gimnasia Acuática:* Asignación estricta por orden de llegada (FIFO).

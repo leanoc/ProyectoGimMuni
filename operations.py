@@ -1,107 +1,198 @@
 import random
 import sqlite3
+import database
 from database import execute_query
 from config import MINIMUM_AGE
 import validators
 
 # --- ALTAS Y VALIDACIONES DE INSCRIPCIÓN ---
 
-def insert_person(dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email):
-    """Inserta una persona en la tabla Persona."""
-    query = """
-        INSERT INTO Persona (dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """
-    execute_query(query, (dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email))
-
 def get_person_by_dni(dni):
     """Obtiene el ID y datos básicos de una persona por su DNI."""
     query = "SELECT id_persona, dni, nombre, apellido, fecha_nac FROM Persona WHERE dni = ?"
     return execute_query(query, (dni,), fetch=True)
 
-def register_applicant(id_persona: int, id_comision: int):
+def _register_applicant(cursor, id_persona: int, id_comision: int):
     """
-    Inscribe a una persona validando:
+    Valida e inscribe a una persona:
     1. Que cumpla la edad mínima estipulada en config.py.
     2. Que no posea una inscripción previa en ningún curso (relación 1:1).
     3. Que la comisión no supere su cupo total permitido.
     4. Que el curso no supere su capacidad total dinámica (suma de sus comisiones).
     """
-    # 1. Validación de edad mínima
-    person_data = execute_query(
-        "SELECT fecha_nac FROM Persona WHERE id_persona = ?",
-        (id_persona,),
-        fetch=True
-    )
+    cursor.execute("SELECT fecha_nac FROM Persona WHERE id_persona = ?", (id_persona,))
+    person_data = cursor.fetchone()
     if not person_data:
         return False, "La persona no existe en el padrón."
 
-    if not validators.validate_minimum_age(person_data[0][0], MINIMUM_AGE):
+    if not validators.validate_minimum_age(person_data[0], MINIMUM_AGE):
         return False, f"Inscripción rechazada: La edad mínima obligatoria es de {MINIMUM_AGE} años."
 
-    # 2. Validación de inscripción única por persona
-    enrolled = execute_query(
-        "SELECT id_inscripcion FROM Inscripcion WHERE id_persona = ?",
-        (id_persona,),
-        fetch=True
-    )
-    if enrolled:
+    cursor.execute("SELECT id_inscripcion FROM Inscripcion WHERE id_persona = ?", (id_persona,))
+    if cursor.fetchone():
         return False, "Inscripción rechazada: La persona ya posee un curso asignado."
 
-    # 3. Validación de comisión y cupo individual
-    comm_data = execute_query(
+    cursor.execute(
         """
         SELECT c.cupo_total, c.id_curso, cur.nombre
         FROM Comision c
         JOIN Curso cur ON c.id_curso = cur.id_curso
         WHERE c.id_comision = ?
         """,
-        (id_comision,),
-        fetch=True
+        (id_comision,)
     )
+    comm_data = cursor.fetchone()
     if not comm_data:
         return False, "La comisión indicada no existe."
 
-    cupo_comision, id_curso, nombre_curso = comm_data[0]
+    cupo_comision, id_curso, nombre_curso = comm_data
 
-    enrolled_comm = execute_query(
-        "SELECT COUNT(*) FROM Inscripcion WHERE id_comision = ?",
-        (id_comision,),
-        fetch=True
-    )[0][0]
+    cursor.execute("SELECT COUNT(*) FROM Inscripcion WHERE id_comision = ?", (id_comision,))
+    enrolled_comm = cursor.fetchone()[0]
 
     if enrolled_comm >= cupo_comision:
         return False, f"Inscripción rechazada: Cupo completo en la comisión ({enrolled_comm}/{cupo_comision})."
 
-    # 4. Validación de cupo total del curso calculado dinámicamente desde SQL
-    max_course_quota = execute_query(
+    cursor.execute(
         "SELECT SUM(cupo_total) FROM Comision WHERE id_curso = ?",
-        (id_curso,),
-        fetch=True
-    )[0][0]
-
-    enrolled_course = execute_query(
+        (id_curso,)
+    )
+    max_course_quota = cursor.fetchone()[0]
+    cursor.execute(
         """
         SELECT COUNT(i.id_inscripcion)
         FROM Inscripcion i
         JOIN Comision c ON i.id_comision = c.id_comision
         WHERE c.id_curso = ?
         """,
-        (id_curso,),
-        fetch=True
-    )[0][0]
+        (id_curso,)
+    )
+    enrolled_course = cursor.fetchone()[0]
 
     if enrolled_course >= max_course_quota:
         return False, f"Inscripción rechazada: Cupo global del curso {nombre_curso} agotado ({enrolled_course}/{max_course_quota})."
 
+    cursor.execute(
+        "INSERT INTO Inscripcion (id_persona, id_comision, estado) VALUES (?, ?, 0)",
+        (id_persona, id_comision)
+    )
+    return True, f"Inscripción confirmada en {nombre_curso} ({enrolled_comm + 1}/{cupo_comision})."
+
+def register_applicant(id_persona: int, id_comision: int):
+    """Inscribe una persona existente, confirmando la operación solo si pasa las validaciones."""
+    conn = database.connect_db()
     try:
-        execute_query(
-            "INSERT INTO Inscripcion (id_persona, id_comision, estado) VALUES (?, ?, 0)",
-            (id_persona, id_comision)
+        result = _register_applicant(conn.cursor(), id_persona, id_comision)
+        if result[0]:
+            conn.commit()
+        else:
+            conn.rollback()
+        return result
+    except sqlite3.IntegrityError as error:
+        conn.rollback()
+        return False, f"Error de integridad en BD: {error}"
+    finally:
+        database.disconnect_db(conn)
+
+def register_new_applicant(
+    dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email, id_comision
+):
+    """Crea una persona y su inscripción en una única transacción."""
+    conn = database.connect_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO Persona (dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email)
         )
-        return True, f"Inscripción confirmada en {nombre_curso} ({enrolled_comm + 1}/{cupo_comision})."
-    except sqlite3.IntegrityError as e:
-        return False, f"Error de integridad en BD: {e}"
+        result = _register_applicant(cursor, cursor.lastrowid, id_comision)
+        if result[0]:
+            conn.commit()
+        else:
+            conn.rollback()
+        return result
+    except sqlite3.IntegrityError as error:
+        conn.rollback()
+        return False, f"Error de integridad en BD: {error}"
+    finally:
+        database.disconnect_db(conn)
+
+def get_admitted_registration_by_dni(dni):
+    """Obtiene los datos de la inscripción admitida de una persona por DNI."""
+    query = """
+        SELECT p.dni, p.nombre, p.apellido, cur.nombre, com.codigo, i.fecha_hora
+        FROM Inscripcion i
+        JOIN Persona p ON i.id_persona = p.id_persona
+        JOIN Comision com ON i.id_comision = com.id_comision
+        JOIN Curso cur ON com.id_curso = cur.id_curso
+        WHERE p.dni = ? AND i.estado = 1
+    """
+    return execute_query(query, (dni,), fetch=True)
+
+def deregister_admitted_applicant(dni):
+    """Da de baja a una persona admitida y promueve al siguiente de su comisión."""
+    conn = database.connect_db()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT p.id_persona, p.nombre, p.apellido, cur.nombre, com.codigo, com.id_comision
+            FROM Inscripcion i
+            JOIN Persona p ON i.id_persona = p.id_persona
+            JOIN Comision com ON i.id_comision = com.id_comision
+            JOIN Curso cur ON com.id_curso = cur.id_curso
+            WHERE p.dni = ? AND i.estado = 1
+            """,
+            (dni,)
+        )
+        admitted = cursor.fetchone()
+        if not admitted:
+            conn.rollback()
+            return False, "No se encontró una inscripción admitida para ese DNI."
+
+        person_id, first_name, last_name, course_name, commission_code, commission_id = admitted
+        cursor.execute("DELETE FROM Persona WHERE id_persona = ?", (person_id,))
+
+        cursor.execute(
+            """
+            SELECT i.id_inscripcion, p.nombre, p.apellido, p.dni
+            FROM Inscripcion i
+            JOIN Persona p ON i.id_persona = p.id_persona
+            WHERE i.id_comision = ? AND i.estado = 0
+            ORDER BY datetime(i.fecha_hora) ASC, i.id_inscripcion ASC
+            LIMIT 1
+            """,
+            (commission_id,)
+        )
+        next_applicant = cursor.fetchone()
+        if next_applicant:
+            inscription_id, next_first_name, next_last_name, next_dni = next_applicant
+            cursor.execute(
+                "UPDATE Inscripcion SET estado = 1 WHERE id_inscripcion = ?",
+                (inscription_id,)
+            )
+            message = (
+                f"Baja confirmada para {first_name} {last_name} en {course_name} "
+                f"({commission_code}). El lugar fue asignado a {next_first_name} "
+                f"{next_last_name} (DNI {next_dni}), siguiente por fecha y hora de inscripción."
+            )
+        else:
+            message = (
+                f"Baja confirmada para {first_name} {last_name} en {course_name} "
+                f"({commission_code}). No había inscriptos pendientes en esta comisión."
+            )
+
+        conn.commit()
+        return True, message
+    except sqlite3.Error as error:
+        conn.rollback()
+        return False, f"Error de base de datos al procesar la baja: {error}"
+    finally:
+        database.disconnect_db(conn)
 
 # --- CONSULTAS DE LECTURA ---
 
@@ -113,7 +204,9 @@ def get_all_commissions():
     """Retorna comisiones con sus límites y conteo de inscriptos actuales."""
     query = """
         SELECT c.id_comision, c.codigo, c.cupo_total, c.cupo_seleccion, cur.nombre, cur.criterio,
-               (SELECT COUNT(*) FROM Inscripcion i WHERE i.id_comision = c.id_comision) AS inscriptos
+               (SELECT COUNT(*) FROM Inscripcion i WHERE i.id_comision = c.id_comision) AS inscriptos,
+               (SELECT COUNT(*) FROM Inscripcion i WHERE i.id_comision = c.id_comision AND i.estado = 1) AS admitidos,
+               (SELECT COUNT(*) FROM Inscripcion i WHERE i.id_comision = c.id_comision AND i.estado = 0) AS en_espera
         FROM Comision c
         JOIN Curso cur ON c.id_curso = cur.id_curso
     """
