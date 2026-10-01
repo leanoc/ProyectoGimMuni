@@ -232,5 +232,143 @@ class TestOperations(unittest.TestCase):
             0
         )
 
+    def test_quota_verification_prevents_insert_when_full(self):
+        # Commission 1 has cupo_total = 30 in base data
+        # Fill it up to 30
+        for i in range(30):
+            dni = f"800000{i:02d}"
+            ok, _ = operations.register_new_applicant(
+                dni, f"Nom{i}", f"Ape{i}", "1995-05-10",
+                "Calle X", "La Plata", "221444", f"{dni}@test.com", 1
+            )
+            self.assertTrue(ok)
+
+        # Now commission 1 is at maximum (30/30)
+        has_quota, quota_msg = operations.check_commission_availability(1)
+        self.assertFalse(has_quota)
+        self.assertIn("cupo completo", quota_msg.lower())
+
+        # Attempt to register 31st applicant must be rejected
+        ok, msg = operations.register_new_applicant(
+            "89999999", "Excedente", "Test", "1995-05-10",
+            "Calle X", "La Plata", "221444", "exc@test.com", 1
+        )
+        self.assertFalse(ok)
+        self.assertIn("cupo completo", msg.lower())
+        # Verify the applicant was NOT created in Persona table either
+        self.assertFalse(operations.get_person_by_dni("89999999"))
+
+    def test_course_crud(self):
+        # Create
+        ok, msg = operations.create_course("Yoga Acuático", "Orden de llegada")
+        self.assertTrue(ok, msg)
+
+        courses = operations.get_all_courses()
+        course_yoga = next((c for c in courses if c[1] == "Yoga Acuático"), None)
+        self.assertIsNotNone(course_yoga)
+        course_id = course_yoga[0]
+
+        # Update
+        ok, msg = operations.update_course(course_id, "Yoga Acuático Pro", "Sorteo")
+        self.assertTrue(ok, msg)
+        updated = operations.get_course_by_id(course_id)[0]
+        self.assertEqual(updated[1], "Yoga Acuático Pro")
+        self.assertEqual(updated[2], "Sorteo")
+
+        # Delete
+        ok, msg = operations.delete_course(course_id)
+        self.assertTrue(ok, msg)
+        self.assertFalse(operations.get_course_by_id(course_id))
+
+    def test_commission_crud(self):
+        # Create commission for course 1
+        ok, msg = operations.create_commission("C3-TEST", 20, 15, 1)
+        self.assertTrue(ok, msg)
+
+        comms = operations.get_all_commissions()
+        c3 = next((c for c in comms if c[1] == "C3-TEST"), None)
+        self.assertIsNotNone(c3)
+        c3_id = c3[0]
+
+        # Update commission (expand quota)
+        ok, msg = operations.update_commission(c3_id, "C3-TEST-MOD", 25, 20, 1)
+        self.assertTrue(ok, msg)
+        comm_info = operations.get_commission_by_id(c3_id)[0]
+        self.assertEqual(comm_info[1], "C3-TEST-MOD")
+        self.assertEqual(comm_info[2], 25)
+        self.assertEqual(comm_info[3], 20)
+
+        # Delete commission
+        ok, msg = operations.delete_commission(c3_id)
+        self.assertTrue(ok, msg)
+        self.assertFalse(operations.get_commission_by_id(c3_id))
+
+    def test_update_person_and_unique_dni(self):
+        ok, _ = operations.register_new_applicant(
+            "90000001", "Ana", "Gomez", "1998-04-12",
+            "Calle 10", "Tolosa", "221111", "ana@test.com", 1
+        )
+        self.assertTrue(ok)
+        ok, _ = operations.register_new_applicant(
+            "90000002", "Beto", "Lopez", "1997-03-10",
+            "Calle 12", "Tolosa", "221222", "beto@test.com", 1
+        )
+        self.assertTrue(ok)
+
+        person1 = operations.get_person_by_dni("90000001")[0]
+        person1_id = person1[0]
+
+        # Attempt to change person 1's DNI to person 2's DNI (collision)
+        ok, msg = operations.update_person(
+            person1_id, "90000002", "Ana Mod", "Gomez Mod", "1998-04-12",
+            "Calle Nueva", "Tolosa", "221999", "ana_mod@test.com"
+        )
+        self.assertFalse(ok)
+        self.assertIn("ya se encuentra registrado", msg.lower())
+
+        # Update person 1 with a valid unique new DNI and new address
+        ok, msg = operations.update_person(
+            person1_id, "90000099", "Ana Mod", "Gomez Mod", "1998-04-12",
+            "Calle Nueva 456", "La Plata", "221999", "ana_mod@test.com"
+        )
+        self.assertTrue(ok, msg)
+        updated_p1 = operations.get_person_by_id(person1_id)[0]
+        self.assertEqual(updated_p1[1], "90000099")
+        self.assertEqual(updated_p1[2], "Ana Mod")
+        self.assertEqual(updated_p1[5], "Calle Nueva 456")
+
+    def test_waiting_list_and_change_commission(self):
+        # Register two applicants in commission 1
+        ok1, _ = operations.register_new_applicant(
+            "91000001", "Postulante1", "Uno", "1995-01-01",
+            "Calle A", "La Plata", "111", "p1@test.com", 1
+        )
+        ok2, _ = operations.register_new_applicant(
+            "91000002", "Postulante2", "Dos", "1995-01-01",
+            "Calle B", "La Plata", "222", "p2@test.com", 1
+        )
+        self.assertTrue(ok1 and ok2)
+
+        # Check waiting list for commission 1
+        wl = operations.get_waiting_list_by_commission(1)
+        dnis_in_wl = [item[0] for item in wl]
+        self.assertIn("91000001", dnis_in_wl)
+        self.assertIn("91000002", dnis_in_wl)
+
+        # Change commission for applicant 1 to commission 2
+        ok_change, msg_change = operations.change_commission_registration("91000001", 2)
+        self.assertTrue(ok_change, msg_change)
+
+        wl_c2 = operations.get_waiting_list_by_commission(2)
+        dnis_c2 = [item[0] for item in wl_c2]
+        self.assertIn("91000001", dnis_c2)
+
+        # Cancel registration for applicant 2
+        ok_cancel, msg_cancel = operations.cancel_registration_by_dni("91000002")
+        self.assertTrue(ok_cancel, msg_cancel)
+        wl_after = operations.get_waiting_list_by_commission(1)
+        dnis_after = [item[0] for item in wl_after]
+        self.assertNotIn("91000002", dnis_after)
+
 if __name__ == '__main__':
     unittest.main()
