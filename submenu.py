@@ -70,6 +70,14 @@ def submenu_courses():
             clear_screen()
             print("--- CREAR NUEVO CURSO ---")
             nombre = prompt_input("Nombre del curso: ", validators.validate_not_empty, "El nombre no puede estar vacío.")
+            
+            # Validacion en cascada: Verificar si el curso ya existe antes de continuar
+            courses_list = operations.get_all_courses()
+            if any(c[1].lower() == nombre.lower() for c in courses_list):
+                print(f"\n  -> Error: Ya existe un curso registrado con el nombre '{nombre}'.")
+                input("\nPresione Enter para continuar...")
+                continue
+
             print("\nCriterios disponibles: 1. Sorteo | 2. Orden de llegada")
             crit_choice = input("Seleccione el criterio (1 o 2): ").strip()
             criterio = "Sorteo" if crit_choice == "1" else "Orden de llegada"
@@ -97,6 +105,14 @@ def submenu_courses():
 
             current_c = course_data[0]
             nuevo_nombre = prompt_input("Nuevo nombre", validators.validate_not_empty, "El nombre no puede estar vacío.", default=current_c[1])
+            
+            # Validacion en cascada: Verificar si el nuevo nombre ya está ocupado
+            courses_list = operations.get_all_courses()
+            if nuevo_nombre.lower() != current_c[1].lower() and any(c[1].lower() == nuevo_nombre.lower() for c in courses_list):
+                print(f"\n  -> Error: Ya existe otro curso con el nombre '{nuevo_nombre}'.")
+                input("\nPresione Enter para continuar...")
+                continue
+
             print(f"Criterio actual: {current_c[2]}. Ingrese 1 para 'Sorteo', 2 para 'Orden de llegada' o Enter para conservar:")
             c_in = input("Opción: ").strip()
             if c_in == "1":
@@ -203,6 +219,13 @@ def submenu_commissions():
             c_id = prompt_input("ID del Curso: ", lambda x: x.isdigit() and any(c[0] == int(x) for c in courses), "ID de curso no válido.")
             codigo = prompt_input("Código de Comisión (ej. C3-NAT): ", validators.validate_not_empty, "El código no puede estar vacío.")
             
+            # Validacion en cascada: Verificar si el código ya existe
+            comms_list = operations.get_all_commissions()
+            if any(c[1].lower() == codigo.lower() for c in comms_list):
+                print(f"\n  -> Error: Ya existe una comisión con el código '{codigo}'.")
+                input("\nPresione Enter para continuar...")
+                continue
+            
             while True:
                 cupo_tot = input("Cupo total permitido: ").strip()
                 if cupo_tot.isdigit() and int(cupo_tot) > 0:
@@ -240,6 +263,14 @@ def submenu_commissions():
 
             current_c = comm_info[0]
             nuevo_codigo = prompt_input("Nuevo código", validators.validate_not_empty, "El código no puede estar vacío.", default=current_c[1])
+            
+            # Validacion en cascada: Verificar si el código ya está siendo usado por otra comisión
+            comms_list = operations.get_all_commissions()
+            if nuevo_codigo.lower() != current_c[1].lower() and any(c[1].lower() == nuevo_codigo.lower() for c in comms_list):
+                print(f"\n  -> Error: El código '{nuevo_codigo}' ya es utilizado por otra comisión.")
+                input("\nPresione Enter para continuar...")
+                continue
+
             nuevo_tot_str = prompt_input("Nuevo cupo total", lambda x: x.isdigit() and int(x) > 0, "Debe ser número positivo.", default=str(current_c[2]))
             nuevo_cupo_tot = int(nuevo_tot_str)
             nuevo_sel_str = prompt_input(
@@ -409,6 +440,15 @@ def submenu_persons():
             # full_data: (id, dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email)
             print("\nDatos actuales (presione Enter para conservar el valor actual):")
             nuevo_dni = prompt_input("DNI", validators.validate_dni, "DNI inválido (7 u 8 dígitos).", default=full_data[1])
+            
+            # Validacion en cascada: Verificar si el DNI pertenece a otra persona
+            if str(nuevo_dni).strip() != str(full_data[1]).strip():
+                existing = operations.get_person_by_dni(nuevo_dni)
+                if existing:
+                    print(f"\n  -> Error: El DNI {nuevo_dni} ya se encuentra registrado por otra persona.")
+                    input("\nPresione Enter para continuar...")
+                    continue
+
             nuevo_nombre = prompt_input("Nombre", validators.validate_not_empty, "No puede estar vacío.", default=full_data[2])
             nuevo_apellido = prompt_input("Apellido", validators.validate_not_empty, "No puede estar vacío.", default=full_data[3])
             
