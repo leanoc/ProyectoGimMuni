@@ -542,38 +542,44 @@ def submenu_selections():
         print("========================================")
         print("  ADJUDICACIÓN DE CUPOS Y RESULTADOS    ")
         print("========================================")
-        print("1. Ejecutar SORTEO de Natación (Aleatorio)")
-        print("2. Aplicar ORDEN DE LLEGADA en Gimnasia Acuática (Sin sorteo)")
-        print("3. Ver titulares admitidos de Natación")
-        print("4. Ver titulares admitidos de Gimnasia Acuática")
-        print("5. Ver listas de espera de las comisiones")
+        print("1. Ejecutar asignaciones por SORTEO (Aleatorio)")
+        print("2. Ejecutar asignaciones por ORDEN DE LLEGADA (FIFO)")
+        print("3. Ver titulares admitidos de un curso")
+        print("4. Ver listas de espera de las comisiones")
         print("0. Volver al menú principal")
         opt = input("\nSeleccione una opción: ").strip()
 
         clear_screen()
         if opt == "1":
-            operations.run_swimming_lottery()
-            print("Sorteo de Natación finalizado correctamente.")
+            operations.run_lottery_assignment()
+            print("Asignaciones por SORTEO finalizadas correctamente.")
         elif opt == "2":
-            operations.run_water_gym_assignment()
-            print("Asignación de Gimnasia Acuática completada por orden de llegada.")
+            operations.run_fifo_assignment()
+            print("Asignaciones por ORDEN DE LLEGADA completadas.")
         elif opt == "3":
-            admitted = operations.get_admitted_by_course(1)
-            if not admitted:
-                print("No hay titulares confirmados para Natación.")
+            courses = operations.get_all_courses()
+            if not courses:
+                print("No hay cursos registrados.")
             else:
-                print("Titulares admitidos - Natación:\n")
-                for a in admitted:
-                    print(f"DNI: {a[0]} | {a[1]} {a[2]} | Comisión: {a[3]} | Fecha: {a[4]}")
+                for c in courses:
+                    print(f"[{c[0]}] {c[1]}")
+                c_id = input("\nIngrese el ID del curso: ").strip()
+                if c_id.isdigit():
+                    course_info = [c for c in courses if c[0] == int(c_id)]
+                    if not course_info:
+                        print("ID de curso no válido.")
+                    else:
+                        nombre_curso = course_info[0][1]
+                        admitted = operations.get_admitted_by_course(int(c_id))
+                        if not admitted:
+                            print(f"No hay titulares confirmados para {nombre_curso}.")
+                        else:
+                            print(f"Titulares admitidos - {nombre_curso}:\n")
+                            for a in admitted:
+                                print(f"DNI: {a[0]} | {a[1]} {a[2]} | Comisión: {a[3]} | Fecha: {a[4]}")
+                else:
+                    print("ID de curso inválido.")
         elif opt == "4":
-            admitted = operations.get_admitted_by_course(2)
-            if not admitted:
-                print("No hay titulares confirmados para Gimnasia Acuática.")
-            else:
-                print("Titulares admitidos - Gimnasia Acuática:\n")
-                for a in admitted:
-                    print(f"DNI: {a[0]} | {a[1]} {a[2]} | Comisión: {a[3]} | Fecha: {a[4]}")
-        elif opt == "5":
             print("--- LISTAS DE ESPERA POR COMISIÓN ---\n")
             commissions = operations.get_all_commissions()
             for comm in commissions:

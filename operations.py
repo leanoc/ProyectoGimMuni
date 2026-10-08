@@ -775,8 +775,8 @@ def get_admitted_by_course(course_id: int):
 
 # --- ADJUDICACIONES Y SORTEO ---
 
-def run_swimming_lottery():
-    """Ejecuta sorteo aleatorio para comisiones con criterio 'Sorteo' (Natación)."""
+def run_lottery_assignment():
+    """Ejecuta sorteo aleatorio para comisiones con criterio 'Sorteo'."""
     commissions = execute_query(
         """
         SELECT c.id_comision, c.cupo_seleccion 
@@ -814,8 +814,8 @@ def run_swimming_lottery():
         for w_id in winners:
             execute_query("UPDATE Inscripcion SET estado = 1 WHERE id_inscripcion = ?", (w_id,))
 
-def run_water_gym_assignment():
-    """Asignación estricta por orden de llegada (FIFO) para Gimnasia Acuática."""
+def run_fifo_assignment():
+    """Asignación estricta por orden de llegada (FIFO)."""
     commissions = execute_query(
         """
         SELECT c.id_comision, c.cupo_seleccion 

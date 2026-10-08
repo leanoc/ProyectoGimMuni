@@ -11,6 +11,7 @@ def display_main_menu():
         clear_screen()
         print("================================")
         print("  SISTEMA INSCRIPCIÓN Y SORTEO  ")
+        print("    Dev: L. M. OCARIZ ARRIETA   ")
         print("================================")
         print("1. Ver Cursos e Inscriptos")
         print("2. Ver Comisiones y Vacantes")
