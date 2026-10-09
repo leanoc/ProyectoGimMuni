@@ -13,6 +13,16 @@ def display_main_menu():
         print("  SISTEMA INSCRIPCIÓN Y SORTEO  ")
         print("    Dev: L. M. OCARIZ ARRIETA   ")
         print("================================")
+        # --- ESTADÍSTICAS ---
+        from database import execute_query
+        try:
+            total_cursos = execute_query("SELECT COUNT(*) FROM Curso", fetch=True)[0][0]
+            total_inscriptos = execute_query("SELECT COUNT(*) FROM Inscripcion", fetch=True)[0][0]
+            print(f"  Estadísticas -> Cursos activos: {total_cursos} | Inscriptos totales: {total_inscriptos}")
+            print("================================")
+        except Exception:
+            pass
+
         print("1. Ver Cursos e Inscriptos")
         print("2. Ver Comisiones y Vacantes")
         print("3. Gestión de Personas e Inscripciones")

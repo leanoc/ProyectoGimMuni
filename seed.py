@@ -20,10 +20,10 @@ def setup_base_data(cursor):
     cursor.execute("SELECT COUNT(*) FROM Curso")
     if cursor.fetchone()[0] == 0:
         cursor.executemany(
-            "INSERT INTO Curso (id_curso, nombre, criterio) VALUES (?, ?, ?)",
+            "INSERT INTO Curso (id_curso, nombre, criterio, edad_minima, cupo_maximo) VALUES (?, ?, ?, ?, ?)",
             [
-                (1, "Natación", "Sorteo"),
-                (2, "Gimnasia Acuática", "Orden de llegada")
+                (1, "Natación", "Sorteo", 16, 60),
+                (2, "Gimnasia Acuática", "Orden de llegada", 60, 100)
             ]
         )
 

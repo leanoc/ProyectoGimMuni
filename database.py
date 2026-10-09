@@ -36,7 +36,9 @@ def create_tables():
         CREATE TABLE IF NOT EXISTS Curso (
             id_curso INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre TEXT NOT NULL,
-            criterio TEXT NOT NULL
+            criterio TEXT NOT NULL,
+            edad_minima INTEGER DEFAULT 16,
+            cupo_maximo INTEGER DEFAULT 50
         );
         """,
         """

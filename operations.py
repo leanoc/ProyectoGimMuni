@@ -22,7 +22,7 @@ def check_commission_availability(id_comision: int, cursor=None):
     try:
         cursor.execute(
             """
-            SELECT c.cupo_total, c.id_curso, cur.nombre, c.codigo
+            SELECT c.cupo_total, c.id_curso, cur.nombre, c.codigo, cur.cupo_maximo
             FROM Comision c
             JOIN Curso cur ON c.id_curso = cur.id_curso
             WHERE c.id_comision = ?
@@ -33,7 +33,7 @@ def check_commission_availability(id_comision: int, cursor=None):
         if not comm_data:
             return False, "La comisión indicada no existe."
 
-        cupo_comision, id_curso, nombre_curso, codigo_comision = comm_data
+        cupo_comision, id_curso, nombre_curso, codigo_comision, cupo_maximo_curso = comm_data
 
         cursor.execute("SELECT COUNT(*) FROM Inscripcion WHERE id_comision = ?", (id_comision,))
         enrolled_comm = cursor.fetchone()[0]
@@ -41,9 +41,7 @@ def check_commission_availability(id_comision: int, cursor=None):
         if enrolled_comm >= cupo_comision:
             return False, f"Inscripción rechazada: Cupo completo en la comisión {codigo_comision} ({enrolled_comm}/{cupo_comision})."
 
-        cursor.execute("SELECT SUM(cupo_total) FROM Comision WHERE id_curso = ?", (id_curso,))
-        sum_cupos = cursor.fetchone()[0]
-        max_course_quota = sum_cupos if sum_cupos is not None else 0
+        max_course_quota = cupo_maximo_curso if cupo_maximo_curso is not None else 0
 
         cursor.execute(
             """
@@ -92,8 +90,21 @@ def _register_applicant(cursor, id_persona: int, id_comision: int):
     if not person_data:
         return False, "La persona no existe en el padrón."
 
-    if not validators.validate_minimum_age(person_data[0], MINIMUM_AGE):
-        return False, f"Inscripción rechazada: La edad mínima obligatoria es de {MINIMUM_AGE} años."
+    # Obtener edad_minima del curso
+    cursor.execute(
+        """
+        SELECT cur.edad_minima
+        FROM Comision c
+        JOIN Curso cur ON c.id_curso = cur.id_curso
+        WHERE c.id_comision = ?
+        """,
+        (id_comision,)
+    )
+    curso_data = cursor.fetchone()
+    edad_min = curso_data[0] if curso_data else MINIMUM_AGE
+
+    if not validators.validate_minimum_age(person_data[0], edad_min):
+        return False, f"Inscripción rechazada: La edad mínima obligatoria es de {edad_min} años."
 
     cursor.execute("SELECT id_inscripcion FROM Inscripcion WHERE id_persona = ?", (id_persona,))
     if cursor.fetchone():
@@ -148,19 +159,33 @@ def register_new_applicant(
     Valida cupos y datos ANTES de registrar a la persona y su inscripción
     en una única transacción atómica.
     """
-    # 1. Validaciones previas de formato y edad mínima antes de tocar la base de datos
+    # 1. Validaciones previas de formato antes de tocar la base de datos
     if not validators.validate_dni(str(dni)):
         return False, "DNI inválido (debe tener entre 7 y 8 dígitos numéricos)."
     if not validators.validate_date(str(fecha_nac)):
         return False, "Fecha de nacimiento inválida en calendario o futura."
-    if not validators.validate_minimum_age(str(fecha_nac), MINIMUM_AGE):
-        return False, f"Inscripción rechazada: La edad mínima obligatoria es de {MINIMUM_AGE} años."
     if not validators.validate_email(str(email)):
         return False, "Formato de correo electrónico no válido."
 
     conn = database.connect_db()
     try:
         cursor = conn.cursor()
+
+        # Validar edad mínima con la configurada en el curso
+        cursor.execute(
+            """
+            SELECT cur.edad_minima
+            FROM Comision c
+            JOIN Curso cur ON c.id_curso = cur.id_curso
+            WHERE c.id_comision = ?
+            """,
+            (id_comision,)
+        )
+        curso_data = cursor.fetchone()
+        edad_min = curso_data[0] if curso_data else MINIMUM_AGE
+        
+        if not validators.validate_minimum_age(str(fecha_nac), edad_min):
+            return False, f"Inscripción rechazada: La edad mínima obligatoria es de {edad_min} años."
 
         # 2. Verificar disponibilidad de cupos de la comisión y curso de antemano
         has_quota, quota_msg = check_commission_availability(id_comision, cursor=cursor)
@@ -309,13 +334,13 @@ def delete_person(id_persona: int):
 
 def get_all_courses():
     """Retorna todos los cursos."""
-    return execute_query("SELECT id_curso, nombre, criterio FROM Curso", fetch=True)
+    return execute_query("SELECT id_curso, nombre, criterio, edad_minima, cupo_maximo FROM Curso", fetch=True)
 
 def get_course_by_id(id_curso: int):
     """Retorna los datos de un curso por ID."""
-    return execute_query("SELECT id_curso, nombre, criterio FROM Curso WHERE id_curso = ?", (id_curso,), fetch=True)
+    return execute_query("SELECT id_curso, nombre, criterio, edad_minima, cupo_maximo FROM Curso WHERE id_curso = ?", (id_curso,), fetch=True)
 
-def create_course(nombre: str, criterio: str):
+def create_course(nombre: str, criterio: str, edad_minima: int = 16, cupo_maximo: int = 50):
     """Crea un nuevo curso en el sistema."""
     if not (validators.validate_not_empty(nombre) and validators.validate_not_empty(criterio)):
         return False, "El nombre y el criterio no pueden estar vacíos."
@@ -330,7 +355,7 @@ def create_course(nombre: str, criterio: str):
         if cursor.fetchone():
             return False, f"Ya existe un curso registrado con el nombre '{nombre.strip()}'."
 
-        cursor.execute("INSERT INTO Curso (nombre, criterio) VALUES (?, ?)", (nombre.strip(), criterio_clean))
+        cursor.execute("INSERT INTO Curso (nombre, criterio, edad_minima, cupo_maximo) VALUES (?, ?, ?, ?)", (nombre.strip(), criterio_clean, edad_minima, cupo_maximo))
         conn.commit()
         return True, f"Curso '{nombre.strip()}' creado con éxito (ID: {cursor.lastrowid})."
     except sqlite3.Error as err:
@@ -339,8 +364,8 @@ def create_course(nombre: str, criterio: str):
     finally:
         database.disconnect_db(conn)
 
-def update_course(id_curso: int, nombre: str, criterio: str):
-    """Modifica el nombre y/o criterio de un curso existente."""
+def update_course(id_curso: int, nombre: str, criterio: str, edad_minima: int, cupo_maximo: int):
+    """Modifica los atributos de un curso existente."""
     if not (validators.validate_not_empty(nombre) and validators.validate_not_empty(criterio)):
         return False, "El nombre y el criterio no pueden estar vacíos."
     criterio_clean = criterio.strip()
@@ -355,8 +380,8 @@ def update_course(id_curso: int, nombre: str, criterio: str):
             return False, f"Ya existe otro curso con el nombre '{nombre.strip()}'."
 
         cursor.execute(
-            "UPDATE Curso SET nombre = ?, criterio = ? WHERE id_curso = ?",
-            (nombre.strip(), criterio_clean, id_curso)
+            "UPDATE Curso SET nombre = ?, criterio = ?, edad_minima = ?, cupo_maximo = ? WHERE id_curso = ?",
+            (nombre.strip(), criterio_clean, edad_minima, cupo_maximo, id_curso)
         )
         if cursor.rowcount == 0:
             conn.rollback()

@@ -82,7 +82,13 @@ def submenu_courses():
             crit_choice = input("Seleccione el criterio (1 o 2): ").strip()
             criterio = "Sorteo" if crit_choice == "1" else "Orden de llegada"
 
-            ok, msg = operations.create_course(nombre, criterio)
+            edad_str = prompt_input("Edad mínima para el curso (ej. 16)", lambda x: x.isdigit() and int(x) > 0, "Debe ser un número mayor a 0.")
+            edad_minima = int(edad_str)
+
+            cupo_str = prompt_input("Cupo máximo global del curso", lambda x: x.isdigit() and int(x) > 0, "Debe ser un número mayor a 0.")
+            cupo_maximo = int(cupo_str)
+
+            ok, msg = operations.create_course(nombre, criterio, edad_minima, cupo_maximo)
             print(f"\n[{'EXITO' if ok else 'ERROR'}] {msg}")
             input("\nPresione Enter para continuar...")
 
@@ -91,7 +97,7 @@ def submenu_courses():
             print("--- MODIFICAR CURSO ---")
             courses = operations.get_all_courses()
             for c in courses:
-                print(f"[{c[0]}] {c[1]} (Criterio actual: {c[2]})")
+                print(f"[{c[0]}] {c[1]} (Criterio: {c[2]}, Edad Mín: {c[3]}, Cupo Máx: {c[4]})")
 
             c_id = input("\nIngrese el ID del curso a modificar (o 0 para cancelar): ").strip()
             if c_id == "0" or not c_id.isdigit():
@@ -122,7 +128,13 @@ def submenu_courses():
             else:
                 nuevo_criterio = current_c[2]
 
-            ok, msg = operations.update_course(int(c_id), nuevo_nombre, nuevo_criterio)
+            edad_str = prompt_input("Nueva edad mínima", lambda x: x.isdigit() and int(x) > 0, "Debe ser mayor a 0.", default=str(current_c[3]))
+            nueva_edad_min = int(edad_str)
+
+            cupo_str = prompt_input("Nuevo cupo máximo", lambda x: x.isdigit() and int(x) > 0, "Debe ser mayor a 0.", default=str(current_c[4]))
+            nuevo_cupo_max = int(cupo_str)
+
+            ok, msg = operations.update_course(int(c_id), nuevo_nombre, nuevo_criterio, nueva_edad_min, nuevo_cupo_max)
             print(f"\n[{'EXITO' if ok else 'ERROR'}] {msg}")
             input("\nPresione Enter para continuar...")
 
