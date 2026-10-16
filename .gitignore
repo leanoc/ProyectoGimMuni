@@ -1,5 +1,9 @@
 __pycache__/
 *.pyc
 system.db
+system.db-journal
+*.db-journal
+*.db-wal
+*.db-shm
 test_system.db
 *.pdf

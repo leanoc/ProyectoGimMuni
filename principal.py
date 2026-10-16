@@ -1,10 +1,16 @@
+"""
+Punto de Entrada Principal - Sistema de Inscripción y Sorteo
+Gimnasio Municipal - Versión 3.0.0 (Interfaz Gráfica Tkinter)
+Desarrollado por: L. M. OCARIZ ARRIETA
+"""
+
 import database
-import menuprincipal
+import gui
 
 def main():
-    """Punto de entrada: genera estructura en base de datos e inicia CLI."""
+    """Punto de entrada principal: genera estructura de base de datos e inicia la GUI."""
     database.create_tables()
-    menuprincipal.display_main_menu()
+    gui.launch_app()
 
 if __name__ == "__main__":
     main()

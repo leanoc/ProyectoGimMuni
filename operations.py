@@ -364,7 +364,7 @@ def create_course(nombre: str, criterio: str, edad_minima: int = 16, cupo_maximo
     finally:
         database.disconnect_db(conn)
 
-def update_course(id_curso: int, nombre: str, criterio: str, edad_minima: int, cupo_maximo: int):
+def update_course(id_curso: int, nombre: str, criterio: str, edad_minima: int = 16, cupo_maximo: int = 50):
     """Modifica los atributos de un curso existente."""
     if not (validators.validate_not_empty(nombre) and validators.validate_not_empty(criterio)):
         return False, "El nombre y el criterio no pueden estar vacíos."
@@ -804,15 +804,17 @@ def run_lottery_assignment():
     """Ejecuta sorteo aleatorio para comisiones con criterio 'Sorteo'."""
     commissions = execute_query(
         """
-        SELECT c.id_comision, c.cupo_seleccion 
+        SELECT c.id_comision, c.cupo_seleccion, c.codigo, cur.nombre 
         FROM Comision c 
         JOIN Curso cur ON c.id_curso = cur.id_curso 
         WHERE cur.criterio = 'Sorteo'
         """,
         fetch=True
     )
+    total_assigned = 0
+    details = []
 
-    for comm_id, cupo_max in commissions:
+    for comm_id, cupo_max, codigo, nombre_curso in commissions:
         selected_count = execute_query(
             "SELECT COUNT(*) FROM Inscripcion WHERE id_comision = ? AND estado = 1",
             (comm_id,),
@@ -838,20 +840,26 @@ def run_lottery_assignment():
 
         for w_id in winners:
             execute_query("UPDATE Inscripcion SET estado = 1 WHERE id_inscripcion = ?", (w_id,))
+        total_assigned += k
+        details.append(f"Comisión {codigo} ({nombre_curso}): {k} titular(es) asignado(s).")
+
+    return total_assigned, details
 
 def run_fifo_assignment():
     """Asignación estricta por orden de llegada (FIFO)."""
     commissions = execute_query(
         """
-        SELECT c.id_comision, c.cupo_seleccion 
+        SELECT c.id_comision, c.cupo_seleccion, c.codigo, cur.nombre 
         FROM Comision c 
         JOIN Curso cur ON c.id_curso = cur.id_curso 
         WHERE cur.criterio = 'Orden de llegada'
         """,
         fetch=True
     )
+    total_assigned = 0
+    details = []
 
-    for comm_id, cupo_max in commissions:
+    for comm_id, cupo_max, codigo, nombre_curso in commissions:
         selected_count = execute_query(
             "SELECT COUNT(*) FROM Inscripcion WHERE id_comision = ? AND estado = 1",
             (comm_id,),
@@ -875,3 +883,43 @@ def run_fifo_assignment():
 
         for a_id in assigned_ids:
             execute_query("UPDATE Inscripcion SET estado = 1 WHERE id_inscripcion = ?", (a_id,))
+        total_assigned += len(assigned_ids)
+        details.append(f"Comisión {codigo} ({nombre_curso}): {len(assigned_ids)} titular(es) asignado(s).")
+
+    return total_assigned, details
+
+def get_all_persons_with_enrollment():
+    """
+    Retorna todas las personas con su inscripción asociada (si la tienen):
+    id_persona, dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email,
+    id_inscripcion, id_comision, codigo_comision, id_curso, nombre_curso, estado, fecha_inscripcion
+    """
+    query = """
+        SELECT p.id_persona, p.dni, p.nombre, p.apellido, p.fecha_nac, 
+               p.direccion, p.localidad, p.telefono, p.email,
+               i.id_inscripcion, i.id_comision, com.codigo, 
+               cur.id_curso, cur.nombre, i.estado, i.fecha_hora
+        FROM Persona p
+        LEFT JOIN Inscripcion i ON p.id_persona = i.id_persona
+        LEFT JOIN Comision com ON i.id_comision = com.id_comision
+        LEFT JOIN Curso cur ON com.id_curso = cur.id_curso
+        ORDER BY p.apellido ASC, p.nombre ASC
+    """
+    return execute_query(query, fetch=True)
+
+def get_dashboard_stats():
+    """Retorna métricas clave para el panel de control del sistema."""
+    cursos = execute_query("SELECT COUNT(*) FROM Curso", fetch=True)[0][0]
+    comisiones = execute_query("SELECT COUNT(*) FROM Comision", fetch=True)[0][0]
+    inscriptos = execute_query("SELECT COUNT(*) FROM Inscripcion", fetch=True)[0][0]
+    admitidos = execute_query("SELECT COUNT(*) FROM Inscripcion WHERE estado = 1", fetch=True)[0][0]
+    en_espera = execute_query("SELECT COUNT(*) FROM Inscripcion WHERE estado = 0", fetch=True)[0][0]
+    personas = execute_query("SELECT COUNT(*) FROM Persona", fetch=True)[0][0]
+    return {
+        "cursos": cursos,
+        "comisiones": comisiones,
+        "inscriptos": inscriptos,
+        "admitidos": admitidos,
+        "en_espera": en_espera,
+        "personas": personas,
+    }

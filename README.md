@@ -1,35 +1,53 @@
 # Sistema de Inscripción y Sorteo - Gimnasio Municipal 🏊‍♂️🏋️‍♀️
+### **Versión 3.0.0 (Interfaz Gráfica de Escritorio con Tkinter)**
+**Desarrollado por: L. M. OCARIZ ARRIETA**
 
-Una aplicación de consola (CLI) desarrollada en Python para gestionar las inscripciones y la asignación de cupos de los cursos del Gimnasio Municipal (Natación y Gimnasia Acuática). 
+---
 
-El sistema incluye validaciones de edad, control de duplicados, operaciones CRUD completas por cada tabla relacional, verificación previa de cupos y adjudicación de lugares mediante sorteo aleatorio o por orden de llegada, utilizando SQLite como base de datos.
+Una aplicación de escritorio completa y moderna desarrollada en Python con **Tkinter nativo y ttk** para gestionar las inscripciones y la adjudicación de cupos de los cursos y disciplinas del Gimnasio Municipal (Natación, Gimnasia Acuática, Fútbol, Atletismo u otros deportes).
 
-## 🚀 Características Principales
+El sistema incluye una interfaz gráfica moderna estructurada con barra lateral de navegación (Sidebar), panel de métricas en tiempo real (Dashboard), operaciones CRUD completas con diálogos interactivos, verificación fail-fast preventiva de vacantes, asignación por sorteo aleatorio o por orden de llegada (FIFO), y base de datos relacional SQLite sin dependencias externas obligatorias.
 
-- **Gestión de Inscripciones con Verificación Previa de Cupos:** Verifica la disponibilidad de vacantes de la comisión y del curso antes de solicitar o insertar datos del postulante. Si una comisión está completa, informa de inmediato sin requerir cargas infructuosas.
-- **Operaciones CRUD por Tabla Relacional:**
-  - **Cursos:** Consulta, creación, actualización de nombre/criterio y baja con eliminación en cascada.
-  - **Comisiones:** Consulta de ocupación en tiempo real, creación, ampliación/modificación de cupos y baja.
-  - **Personas:** Consulta, búsqueda por DNI, actualización de registros guardados (con validación de DNI UNIQUE y edad mínima) y baja.
-  - **Inscripciones:** Alta atómica, reasignación/cambio de comisión y cancelación.
-- **Visualización de Listas de Espera:** Consulta detallada y ordenada de los postulantes en espera (`estado = 0`) para cada comisión con su respectivo orden de mérito/llegada (`#01`, `#02`...).
-- **Regla de Inscripción Única:** Bloquea de forma automática los intentos de inscripción a múltiples cursos por una misma persona (relación 1:1).
-- **Bajas y Reemplazo Automático:** Al dar de baja a una persona admitida como titular, el siguiente inscripto de la lista de espera por fecha y hora ocupa su lugar automáticamente.
-- **Algoritmos de Adjudicación:**
-  - *Natación:* Asignación de vacantes mediante sorteo aleatorio automatizado.
-  - *Gimnasia Acuática:* Asignación estricta por orden de llegada (FIFO).
-- **Entorno Persistente:** Base de datos relacional robusta gestionada con SQLite (`system.db`).
+---
 
-## 📖 Manual de Procedimientos
+## 🚀 Características Principales (Versión 3)
 
-Para consultar la guía detallada de operación paso a paso, flujos de trabajo y matriz de errores, consulte el archivo:
-👉 [**Manual de Procedimientos (MANUAL_DE_PROCEDIMIENTOS.md)**](MANUAL_DE_PROCEDIMIENTOS.md)
+- **Interfaz Gráfica Moderna con Tkinter & ttk (100% nativa de Python):**
+  - Panel lateral de navegación (*Sidebar*) con diseño oscuro profesional, selector activo y firma del autor.
+  - *Dashboard* interactivo con tarjetas de indicadores clave (*KPIs*) actualizadas en vivo (Cursos activos, comisiones, inscriptos, titulares admitidos y postulantes en lista de espera).
+  - Tablas estilizadas (*ttk.Treeview*) con buscador reactivo en tiempo real y filtrado dinámico.
+  - Diálogos modales accesibles para altas, modificaciones, confirmaciones de baja y visualizadores de listas.
+
+- **Gestión Integral de Cursos (CRUD):**
+  - Creación, modificación y eliminación en cascada de cursos y deportes.
+  - Configuración personalizada de criterio de adjudicación (*Sorteo* o *Orden de llegada*), edad mínima requerida y cupo máximo global.
+  - Visualizador modal de postulantes inscriptos por curso.
+
+- **Comisiones y Monitoreo de Cupos:**
+  - Consulta en tiempo real de ocupación: Inscriptos vs. Cupo Total, Admitidos vs. Cupo de Selección, y Vacantes Libres.
+  - Visualizador cronológico detallado de la **Lista de Espera** con numeración de orden de mérito/llegada (`#01`, `#02`...), DNI, nombre y fecha/hora exacta.
+
+- **Padrón de Personas e Inscripciones:**
+  - **Verificación Previa Fail-Fast:** Al seleccionar una comisión, el sistema comprueba la disponibilidad inmediata de cupos antes de permitir la carga de datos personales.
+  - Control riguroso de unicidad de DNI y regla de curso único (1:1, una persona solo puede participar en una comisión).
+  - Cálculo automático de edad con validación contra la edad mínima obligatoria configurada.
+  - Cambio y reasignación de comisiones con verificación preventiva de vacantes.
+  - Bajas con **promoción automática**: al dar de baja a un titular admitido, el primer postulante en lista de espera asciende a titular inmediatamente.
+
+- **Módulo de Sorteos y Adjudicación:**
+  - Paneles diferenciados para **Sorteo Aleatorio** y **Orden de Llegada (FIFO)** con confirmación previa y reporte detallado de adjudicados.
+  - Inspector de resultados con filtro de condición (Titulares admitidos / En lista de espera).
+
+---
 
 ## 🛠️ Tecnologías Utilizadas
 
-- **Lenguaje:** Python 3.x (Puro, sin dependencias externas pesadas).
-- **Base de Datos:** SQLite (Módulo `sqlite3` nativo de Python).
-- **Testing:** `unittest` (Módulo nativo de Python).
+- **Lenguaje:** Python 3.10+ (100% estándar, sin requerir paquetes externos pesados).
+- **Interfaz Gráfica (GUI):** `tkinter` y `tkinter.ttk` (nativo de la librería estándar).
+- **Base de Datos:** SQLite 3 (Módulo nativo `sqlite3`).
+- **Pruebas Automatizadas:** `unittest` (Suite completa de 17 pruebas unitarias).
+
+---
 
 ## ⚙️ Instalación y Uso
 
@@ -39,38 +57,56 @@ Para consultar la guía detallada de operación paso a paso, flujos de trabajo y
    cd ProyectoGimMuni
    ```
 
-2. **Ejecutar el sistema:**
-   No requiere instalar librerías adicionales. Simplemente ejecuta el archivo principal:
+2. **Ejecutar la aplicación (GUI):**
+   Al no depender de librerías externas pesadas, basta con ejecutar el archivo principal:
    ```bash
    python principal.py
    ```
 
-3. **Poblar la base de datos (Opcional):**
-   Si deseas probar el sistema con datos de prueba, ejecuta el script auxiliar:
+3. **Cargar datos de prueba (Opcional):**
+   Si deseas poblar rápidamente el sistema con datos de demostración:
    ```bash
    python seed.py
    ```
-   *Nota: El sistema funciona de manera óptima tanto con los cupos vacíos, a medias o al máximo.*
+
+---
 
 ## 🧪 Pruebas Unitarias (Testing)
 
-El proyecto cuenta con un entorno de pruebas automatizadas (17 tests) para garantizar la fiabilidad de las validaciones, el CRUD y la lógica de negocio.
+El proyecto cuenta con una suite integral de 17 pruebas automatizadas para verificar integridad de datos, validaciones de cupo, lógica de negocio y bajas en cascada:
 
-Para correr los tests, ejecuta:
 ```bash
 python test_gym.py
 ```
-*Los tests utilizan una base de datos temporal para no alterar los datos reales de tu sistema.*
+
+---
 
 ## 📂 Estructura del Proyecto
 
-- `principal.py`: Punto de entrada de la aplicación.
-- `menuprincipal.py`: Menú principal del sistema.
-- `submenu.py`: Submenús interactivos para cursos, comisiones, personas/inscripciones y sorteos.
-- `operations.py`: Lógica de negocio, consultas SQL, validaciones previas de cupo y CRUD.
-- `database.py`: Conexión y configuración de las tablas SQLite.
-- `validators.py`: Funciones auxiliares para validar datos de entrada (DNI, fechas, correos, campos requeridos).
-- `config.py`: Variables de configuración general (ej. edad mínima obligatoria).
-- `test_gym.py`: Suite de 17 pruebas unitarias automatizadas.
-- `seed.py`: Script auxiliar para carga masiva de prueba.
-- `MANUAL_DE_PROCEDIMIENTOS.md`: Documento formal de procedimientos y uso del sistema.
+```text
+GimnasioMunicipal/
+├── gui/                         # Paquete de la interfaz gráfica Tkinter
+│   ├── __init__.py              # Exportador del punto de entrada GUI
+│   ├── app.py                   # Ventana principal, navegación y controlador
+│   ├── theme.py                 # Paleta de colores, tipografías y estilos ttk
+│   ├── components/
+│   │   └── dialogs.py           # Diálogos modales (Cursos, Comisiones, Inscripción, etc.)
+│   └── views/
+│       ├── dashboard_view.py    # Vista del panel de control y resumen
+│       ├── courses_view.py      # Vista de gestión de cursos (CRUD)
+│       ├── commissions_view.py  # Vista de comisiones y vacantes
+│       ├── persons_view.py      # Vista de padrón de personas e inscripciones
+│       └── selections_view.py   # Vista de sorteos y adjudicaciones
+├── principal.py                 # Punto de entrada de la aplicación
+├── operations.py                # Lógica de negocio, consultas SQL y operaciones
+├── database.py                  # Conexión y esquema relacional SQLite
+├── validators.py                # Validadores de entrada (DNI, fechas, emails, etc.)
+├── config.py                    # Configuración global
+├── test_gym.py                  # Suite de 17 tests unitarios automatizados
+├── seed.py                      # Script auxiliar de población de datos
+├── MANUAL_DE_PROCEDIMIENTOS.md  # Manual operativo paso a paso
+└── ErroresEncontrados.md        # Registro histórico de mejoras y requerimientos
+```
+
+---
+*Gimnasio Municipal - Sistema de Inscripción y Sorteo | Dev: L. M. OCARIZ ARRIETA*
