@@ -129,14 +129,18 @@ class PersonsView(tk.Frame):
         self.tree.column("curso", width=150)
         self.tree.column("comision", width=85, anchor="center")
         self.tree.column("condicion", width=120, anchor="center")
+        for column in cols:
+            self.tree.column(column, stretch=False)
 
         self.tree.tag_configure("admitido", foreground=COLOR_SUCCESS)
         self.tree.tag_configure("espera", foreground=COLOR_WARNING)
         self.tree.tag_configure("sin_curso", foreground=TEXT_MUTED)
 
         scroll_y = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scroll_y.set)
+        scroll_x = ttk.Scrollbar(table_frame, orient="horizontal", command=self.tree.xview)
+        self.tree.configure(yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set)
 
+        scroll_x.pack(side="bottom", fill="x")
         self.tree.pack(side="left", fill="both", expand=True)
         scroll_y.pack(side="right", fill="y")
 

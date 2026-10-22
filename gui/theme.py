@@ -6,6 +6,7 @@ Desarrollado por: L. M. OCARIZ ARRIETA
 
 import tkinter as tk
 from tkinter import ttk
+from typing import Optional, Tuple
 
 # Paleta de Colores Moderna (Slate & Royal Blue)
 BG_MAIN = "#F8FAFC"             # Fondo general gris muy claro
@@ -43,12 +44,32 @@ FONT_SMALL = (FONT_FAMILY, 9)
 FONT_KPI_VAL = (FONT_FAMILY, 22, "bold")
 FONT_KPI_LBL = (FONT_FAMILY, 9, "bold")
 
-def center_window(window, width, height):
-    """Centra una ventana respecto a la pantalla."""
+def center_window(
+    window: tk.Misc,
+    width: int,
+    height: int,
+    parent: Optional[tk.Misc] = None
+) -> Tuple[int, int]:
+    """Ajusta el tamaño de una ventana y la centra en pantalla o sobre su padre."""
     window.update_idletasks()
-    x = max(0, (window.winfo_screenwidth() // 2) - (width // 2))
-    y = max(0, (window.winfo_screenheight() // 2) - (height // 2))
+    screen_width = window.winfo_screenwidth()
+    screen_height = window.winfo_screenheight()
+    available_height = max(1, screen_height - 80)
+    width = min(width, max(1, screen_width - 40))
+    height = min(height, available_height)
+
+    if parent is not None:
+        parent_window = parent.winfo_toplevel()
+        parent_window.update_idletasks()
+        x = parent_window.winfo_rootx() + (parent_window.winfo_width() - width) // 2
+        y = parent_window.winfo_rooty() + (parent_window.winfo_height() - height) // 2
+    else:
+        x = (screen_width - width) // 2
+        y = (screen_height - height) // 2
+        x = max(0, min(x, screen_width - width))
+        y = max(0, min(y, screen_height - height))
     window.geometry(f"{width}x{height}+{x}+{y}")
+    return width, height
 
 def setup_theme(root: tk.Tk):
     """Aplica configuraciones visuales globales y estilos ttk."""

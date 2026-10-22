@@ -423,7 +423,7 @@ def get_all_commissions():
                (SELECT COUNT(*) FROM Inscripcion i WHERE i.id_comision = c.id_comision) AS inscriptos,
                (SELECT COUNT(*) FROM Inscripcion i WHERE i.id_comision = c.id_comision AND i.estado = 1) AS admitidos,
                (SELECT COUNT(*) FROM Inscripcion i WHERE i.id_comision = c.id_comision AND i.estado = 0) AS en_espera,
-               c.id_curso
+               c.id_curso, cur.edad_minima
         FROM Comision c
         JOIN Curso cur ON c.id_curso = cur.id_curso
         ORDER BY c.id_comision ASC

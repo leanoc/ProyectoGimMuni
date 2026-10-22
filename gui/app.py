@@ -25,8 +25,8 @@ class GymApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Sistema de Inscripción y Sorteo - Gimnasio Municipal | Dev: L. M. OCARIZ ARRIETA")
-        self.minsize(1050, 680)
-        center_window(self, 1200, 740)
+        window_width, window_height = center_window(self, 1200, 740)
+        self.minsize(min(800, window_width), min(500, window_height))
 
         # Aplicar tema ttk y paleta de colores
         setup_theme(self)
@@ -62,7 +62,7 @@ class GymApp(tk.Tk):
 
         tk.Label(
             brand_frame,
-            text="🏊‍♂️ 🏋️‍♀️",
+            text="  ",
             font=("Segoe UI", 22),
             bg=BG_SIDEBAR,
             fg="#FFFFFF"
@@ -189,9 +189,43 @@ class GymApp(tk.Tk):
             fg=COLOR_SUCCESS
         ).pack()
 
-        # Área dinámica donde se muestran las vistas
-        self.content_area = tk.Frame(self.right_container, bg=BG_MAIN)
-        self.content_area.pack(fill="both", expand=True)
+        # Área dinámica desplazable para pantallas de menor resolución.
+        self.content_canvas = tk.Canvas(
+            self.right_container,
+            bg=BG_MAIN,
+            highlightthickness=0
+        )
+        content_scroll = ttk.Scrollbar(
+            self.right_container,
+            orient="vertical",
+            command=self.content_canvas.yview
+        )
+        content_scroll_x = ttk.Scrollbar(
+            self.right_container,
+            orient="horizontal",
+            command=self.content_canvas.xview
+        )
+        self.content_canvas.configure(
+            xscrollcommand=content_scroll_x.set,
+            yscrollcommand=content_scroll.set
+        )
+        content_scroll.pack(side="right", fill="y")
+        content_scroll_x.pack(side="bottom", fill="x")
+        self.content_canvas.pack(side="left", fill="both", expand=True)
+
+        self.content_area = tk.Frame(self.content_canvas, bg=BG_MAIN)
+        self._content_window = self.content_canvas.create_window(
+            (0, 0),
+            window=self.content_area,
+            anchor="nw"
+        )
+        self.content_area.bind("<Configure>", self._configure_content_area)
+        self.content_canvas.bind("<Configure>", self._configure_content_area)
+
+    def _configure_content_area(self, event: tk.Event) -> None:
+        content_width = max(event.width, self.content_area.winfo_reqwidth())
+        self.content_canvas.itemconfigure(self._content_window, width=content_width)
+        self.content_canvas.configure(scrollregion=self.content_canvas.bbox("all"))
 
     def on_nav_hover(self, container, label, view_key, is_hover):
         if self.current_view_name == view_key:

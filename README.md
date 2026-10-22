@@ -17,6 +17,8 @@ El sistema incluye una interfaz gráfica moderna estructurada con barra lateral 
   - *Dashboard* interactivo con tarjetas de indicadores clave (*KPIs*) actualizadas en vivo (Cursos activos, comisiones, inscriptos, titulares admitidos y postulantes en lista de espera).
   - Tablas estilizadas (*ttk.Treeview*) con buscador reactivo en tiempo real y filtrado dinámico.
   - Diálogos modales accesibles para altas, modificaciones, confirmaciones de baja y visualizadores de listas.
+  - Ventana, vistas y diálogos adaptables a pantallas de menor resolución, con desplazamiento cuando el contenido excede el espacio disponible.
+  - Tablas con desplazamiento horizontal para consultar todas las columnas en ventanas angostas.
 
 - **Gestión Integral de Cursos (CRUD):**
   - Creación, modificación y eliminación en cascada de cursos y deportes.
@@ -45,7 +47,7 @@ El sistema incluye una interfaz gráfica moderna estructurada con barra lateral 
 - **Lenguaje:** Python 3.10+ (100% estándar, sin requerir paquetes externos pesados).
 - **Interfaz Gráfica (GUI):** `tkinter` y `tkinter.ttk` (nativo de la librería estándar).
 - **Base de Datos:** SQLite 3 (Módulo nativo `sqlite3`).
-- **Pruebas Automatizadas:** `unittest` (Suite completa de 17 pruebas unitarias).
+- **Pruebas Automatizadas:** `unittest` (suite de pruebas de lógica de negocio y adaptación del diseño a distintas resoluciones).
 
 ---
 
@@ -73,10 +75,10 @@ El sistema incluye una interfaz gráfica moderna estructurada con barra lateral 
 
 ## 🧪 Pruebas Unitarias (Testing)
 
-El proyecto cuenta con una suite integral de 17 pruebas automatizadas para verificar integridad de datos, validaciones de cupo, lógica de negocio y bajas en cascada:
+El proyecto cuenta con pruebas automatizadas para verificar integridad de datos, validaciones de cupo, lógica de negocio, bajas en cascada y ajuste/centrado de ventanas según el tamaño de pantalla:
 
 ```bash
-python test_gym.py
+python -m unittest discover -v
 ```
 
 ---
@@ -102,7 +104,8 @@ GimnasioMunicipal/
 ├── database.py                  # Conexión y esquema relacional SQLite
 ├── validators.py                # Validadores de entrada (DNI, fechas, emails, etc.)
 ├── config.py                    # Configuración global
-├── test_gym.py                  # Suite de 17 tests unitarios automatizados
+├── test_gym.py                  # Pruebas automatizadas de la lógica de negocio
+├── test_gui_layout.py           # Pruebas de adaptación geométrica de ventanas
 ├── seed.py                      # Script auxiliar de población de datos
 ├── MANUAL_DE_PROCEDIMIENTOS.md  # Manual operativo paso a paso
 └── ErroresEncontrados.md        # Registro histórico de mejoras y requerimientos

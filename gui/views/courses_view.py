@@ -166,10 +166,14 @@ class CoursesView(tk.Frame):
         self.tree.column("edad_minima", width=150, anchor="center")
         self.tree.column("cupo_maximo", width=150, anchor="center")
         self.tree.column("inscriptos", width=120, anchor="center")
+        for column in cols:
+            self.tree.column(column, stretch=False)
 
         scroll = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scroll.set)
+        scroll_x = ttk.Scrollbar(table_frame, orient="horizontal", command=self.tree.xview)
+        self.tree.configure(yscrollcommand=scroll.set, xscrollcommand=scroll_x.set)
 
+        scroll_x.pack(side="bottom", fill="x")
         self.tree.pack(side="left", fill="both", expand=True)
         scroll.pack(side="right", fill="y")
 

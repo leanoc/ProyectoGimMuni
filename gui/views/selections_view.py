@@ -140,13 +140,17 @@ class SelectionsView(tk.Frame):
         self.tree.column("comision", width=100, anchor="center")
         self.tree.column("fecha_hora", width=180, anchor="center")
         self.tree.column("condicion", width=150, anchor="center")
+        for column in cols:
+            self.tree.column(column, stretch=False)
 
         self.tree.tag_configure("admitido", foreground=COLOR_SUCCESS)
         self.tree.tag_configure("espera", foreground=COLOR_WARNING)
 
         scroll = ttk.Scrollbar(f_insp, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scroll.set)
+        scroll_x = ttk.Scrollbar(f_insp, orient="horizontal", command=self.tree.xview)
+        self.tree.configure(yscrollcommand=scroll.set, xscrollcommand=scroll_x.set)
 
+        scroll_x.pack(side="bottom", fill="x")
         self.tree.pack(side="left", fill="both", expand=True)
         scroll.pack(side="right", fill="y")
 

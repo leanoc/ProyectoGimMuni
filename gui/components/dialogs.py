@@ -12,15 +12,8 @@ from config import MINIMUM_AGE
 from gui.theme import (
     BG_CARD, BG_MAIN, TEXT_MAIN, TEXT_MUTED, COLOR_PRIMARY,
     COLOR_SUCCESS, COLOR_DANGER, FONT_TITLE, FONT_SUBTITLE,
-    FONT_SECTION, FONT_BODY, FONT_BODY_BOLD, FONT_SMALL
+    FONT_SECTION, FONT_BODY, FONT_BODY_BOLD, FONT_SMALL, center_window
 )
-
-def center_window(window, width, height):
-    """Centra una ventana respecto a la pantalla o ventana padre."""
-    window.update_idletasks()
-    x = (window.winfo_screenwidth() // 2) - (width // 2)
-    y = (window.winfo_screenheight() // 2) - (height // 2)
-    window.geometry(f"{width}x{height}+{x}+{y}")
 
 
 class BaseDialog(tk.Toplevel):
@@ -31,15 +24,55 @@ class BaseDialog(tk.Toplevel):
         self.transient(parent)
         self.grab_set()
         self.configure(bg=BG_MAIN)
-        self.resizable(False, False)
-        center_window(self, width, height)
+        self.resizable(True, True)
+        center_window(self, width, height, parent)
         self.result = False
 
-        # Contenedor principal con padding
-        self.main_container = tk.Frame(self, bg=BG_MAIN, padx=20, pady=18)
-        self.main_container.pack(fill="both", expand=True)
+        scroll_container = tk.Frame(self, bg=BG_MAIN)
+        scroll_container.pack(fill="both", expand=True)
+        self.content_canvas = tk.Canvas(
+            scroll_container,
+            bg=BG_MAIN,
+            highlightthickness=0
+        )
+        content_scroll = ttk.Scrollbar(
+            scroll_container,
+            orient="vertical",
+            command=self.content_canvas.yview
+        )
+        content_scroll_x = ttk.Scrollbar(
+            scroll_container,
+            orient="horizontal",
+            command=self.content_canvas.xview
+        )
+        self.content_canvas.configure(
+            xscrollcommand=content_scroll_x.set,
+            yscrollcommand=content_scroll.set
+        )
+        content_scroll.pack(side="right", fill="y")
+        content_scroll_x.pack(side="bottom", fill="x")
+        self.content_canvas.pack(side="left", fill="both", expand=True)
+
+        self.main_container = tk.Frame(
+            self.content_canvas,
+            bg=BG_MAIN,
+            padx=20,
+            pady=18
+        )
+        self._content_window = self.content_canvas.create_window(
+            (0, 0),
+            window=self.main_container,
+            anchor="nw"
+        )
+        self.main_container.bind("<Configure>", self._configure_content_area)
+        self.content_canvas.bind("<Configure>", self._configure_content_area)
 
         self.bind("<Escape>", lambda e: self.destroy())
+
+    def _configure_content_area(self, event: tk.Event) -> None:
+        content_width = max(event.width, self.main_container.winfo_reqwidth())
+        self.content_canvas.itemconfigure(self._content_window, width=content_width)
+        self.content_canvas.configure(scrollregion=self.content_canvas.bbox("all"))
 
 
 class CourseDialog(BaseDialog):
@@ -406,14 +439,15 @@ class RegisterApplicantDialog(BaseDialog):
             return
         c = self.comm_map[selected]
         libres = c[2] - c[6]
+        edad_min = c[10] if len(c) > 10 else 16
         if libres > 0:
             self.lbl_vacancy_alert.config(
-                text=f"✓ Cupo disponible: {libres} vacantes en {c[1]} (Ocupación: {c[6]}/{c[2]}).",
+                text=f"✓ Cupo disponible: {libres} vacantes en {c[1]} (Ocupación: {c[6]}/{c[2]}) | Edad mínima: {edad_min} años.",
                 fg=COLOR_SUCCESS
             )
         else:
             self.lbl_vacancy_alert.config(
-                text=f"⚠ Comisión completa ({c[6]}/{c[2]}). No se pueden admitir más inscripciones.",
+                text=f"⚠ Comisión completa ({c[6]}/{c[2]}). No se pueden admitir más inscripciones. | Edad mínima: {edad_min} años.",
                 fg=COLOR_DANGER
             )
 
