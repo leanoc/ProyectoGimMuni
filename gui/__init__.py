@@ -1,6 +1,6 @@
 """
 Paquete GUI para el Sistema de Inscripción y Sorteo del Gimnasio Municipal.
-Versión 3.0.0
+Versión 3.1.0
 Desarrollado por: L. M. OCARIZ ARRIETA
 """
 

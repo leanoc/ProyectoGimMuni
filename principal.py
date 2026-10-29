@@ -1,6 +1,6 @@
 """
 Punto de Entrada Principal - Sistema de Inscripción y Sorteo
-Gimnasio Municipal - Versión 3.0.0 (Interfaz Gráfica Tkinter)
+Gimnasio Municipal - Versión 3.1.0 (Interfaz Gráfica Tkinter)
 Desarrollado por: L. M. OCARIZ ARRIETA
 """
 

@@ -3,13 +3,41 @@ import datetime
 import os
 import sqlite3
 import tempfile
+from unittest.mock import MagicMock, patch
 
 # Import modules to test
 import validators
 import database
 import operations
 import config
+import notifications
 from seed import setup_base_data
+
+
+class TestNotifications(unittest.TestCase):
+    def test_build_mailto_url(self):
+        url = notifications.build_mailto_url(
+            "persona@example.com", "Asunto Prueba", "Hola Mundo\nLínea 2"
+        )
+        self.assertTrue(url.startswith("mailto:persona@example.com?"))
+        self.assertIn("subject=Asunto%20Prueba", url)
+        self.assertIn("body=Hola%20Mundo%0AL%C3%ADnea%202", url)
+
+    def test_send_email_opens_mailto(self):
+        with patch("notifications.webbrowser.open", return_value=True) as mock_open:
+            sent, detail = notifications.send_email(
+                "person@example.com", "Asunto", "Mensaje"
+            )
+
+        self.assertTrue(sent, detail)
+        mock_open.assert_called_once()
+        self.assertTrue(mock_open.call_args[0][0].startswith("mailto:person@example.com?"))
+
+    def test_send_email_invalid_recipient(self):
+        sent, detail = notifications.send_email("invalido", "Asunto", "Mensaje")
+        self.assertFalse(sent)
+        self.assertIn("destinatario no es válida", detail)
+
 
 class TestValidators(unittest.TestCase):
     def test_validate_dni(self):
@@ -92,6 +120,61 @@ class TestOperations(unittest.TestCase):
             1
         )
 
+    def test_registration_sends_receipt_email(self):
+        with patch(
+            "operations.notifications.send_email",
+            return_value=(True, "Correo enviado."),
+        ) as send_email:
+            success, message = operations.register_new_applicant(
+                "11111112", "Ana", "Prueba", "2000-01-01",
+                "Calle 1", "Berisso", "1234", "ana@example.com", 1
+            )
+
+        self.assertTrue(success, message)
+        self.assertIn("Correo de inscripción enviado", message)
+        self.assertEqual(send_email.call_args.args[0], "ana@example.com")
+        self.assertIn("inscripción", send_email.call_args.args[1].lower())
+
+    def test_export_data_returns_only_selected_columns(self):
+        headers, rows = operations.get_export_data("Curso", ("nombre", "criterio"))
+
+        self.assertEqual(headers, ("nombre", "criterio"))
+        self.assertTrue(rows)
+        self.assertEqual(len(rows[0]), 2)
+
+        with self.assertRaises(ValueError):
+            operations.get_export_data("Persona", ("password",))
+
+    def test_assignments_send_confirmation_to_new_admitted_people(self):
+        with patch(
+            "operations.notifications.send_email",
+            return_value=(True, "Correo enviado."),
+        ) as send_email:
+            lottery_ok, lottery_message = operations.register_new_applicant(
+                "11111113", "Loteria", "Prueba", "1990-01-01",
+                "Calle 1", "Berisso", "1234", "lottery@example.com", 1
+            )
+            fifo_ok, fifo_message = operations.register_new_applicant(
+                "11111114", "Llegada", "Prueba", "1950-01-01",
+                "Calle 1", "Berisso", "1234", "fifo@example.com", 3
+            )
+            self.assertTrue(lottery_ok, lottery_message)
+            self.assertTrue(fifo_ok, fifo_message)
+            send_email.reset_mock()
+
+            lottery_count, lottery_details = operations.run_lottery_assignment()
+            fifo_count, fifo_details = operations.run_fifo_assignment()
+
+        self.assertEqual(lottery_count, 1)
+        self.assertEqual(fifo_count, 1)
+        self.assertIn("Correo de confirmación enviado", "\n".join(lottery_details))
+        self.assertIn("Correo de confirmación enviado", "\n".join(fifo_details))
+        self.assertEqual(send_email.call_count, 2)
+        self.assertEqual(
+            {call.args[0] for call in send_email.call_args_list},
+            {"lottery@example.com", "fifo@example.com"},
+        )
+
     def test_register_applicant_underage(self):
         # Underage person (born 10 years ago)
         today = datetime.date.today()
@@ -149,10 +232,16 @@ class TestOperations(unittest.TestCase):
                 (enrolled_at, 1 if dni == "55555551" else 0, dni)
             )
 
-        success, msg = operations.deregister_admitted_applicant("55555551")
+        with patch(
+            "operations.notifications.send_email",
+            return_value=(True, "Correo enviado."),
+        ) as send_email:
+            success, msg = operations.deregister_admitted_applicant("55555551")
 
         self.assertTrue(success, msg)
         self.assertIn("Primera Test", msg)
+        self.assertIn("Correo de confirmación enviado", msg)
+        send_email.assert_called_once()
         self.assertFalse(operations.get_person_by_dni("55555551"))
         self.assertEqual(
             database.execute_query(

@@ -1,12 +1,12 @@
 # config.py
 """
 Configuración Global y Parámetros del Sistema
-Gimnasio Municipal - Versión 3.0.0
+Gimnasio Municipal - Versión 3.1.0
 """
 
 # Metadatos del Sistema e Institución
 APP_TITLE = "Sistema de Inscripción y Sorteo - Gimnasio Municipal"
-APP_VERSION = "3.0.0"
+APP_VERSION = "3.1.0"
 APP_DEVELOPER = "L. M. OCARIZ ARRIETA"
 INSTITUTION_NAME = "Gimnasio Municipal"
 

@@ -1,6 +1,6 @@
 """
 Vista de Gestión de Cursos (CRUD) para la GUI de Tkinter.
-Gimnasio Municipal - Versión 3.0.0
+Gimnasio Municipal - Versión 3.1.0
 Desarrollado por: L. M. OCARIZ ARRIETA
 """
 

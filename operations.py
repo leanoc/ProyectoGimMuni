@@ -4,6 +4,83 @@ import database
 from database import execute_query
 from config import MINIMUM_AGE
 import validators
+import notifications
+
+
+EXPORT_COLUMNS = {
+    "Curso": ("id_curso", "nombre", "criterio", "edad_minima", "cupo_maximo"),
+    "Comision": ("id_comision", "codigo", "cupo_total", "cupo_seleccion", "id_curso"),
+    "Persona": (
+        "id_persona", "dni", "nombre", "apellido", "fecha_nac",
+        "direccion", "localidad", "telefono", "email",
+    ),
+    "Inscripcion": (
+        "id_inscripcion", "fecha_hora", "estado", "id_persona", "id_comision",
+    ),
+}
+
+
+def _send_enrollment_email(inscription_id: int, confirmed: bool = False) -> str:
+    """Envía el aviso de inscripción o confirmación para una inscripción existente."""
+    enrollment = execute_query(
+        """
+        SELECT p.nombre, p.apellido, p.email, cur.nombre, com.codigo
+        FROM Inscripcion i
+        JOIN Persona p ON p.id_persona = i.id_persona
+        JOIN Comision com ON com.id_comision = i.id_comision
+        JOIN Curso cur ON cur.id_curso = com.id_curso
+        WHERE i.id_inscripcion = ?
+        """,
+        (inscription_id,),
+        fetch=True,
+    )
+    if not enrollment:
+        return "AVISO: no se encontraron los datos para enviar el correo."
+
+    first_name, last_name, email, course_name, commission_code = enrollment[0]
+    full_name = f"{first_name} {last_name}"
+    if confirmed:
+        subject = f"Confirmación de vacante: {course_name}"
+        body = (
+            f"Hola {full_name}:\n\n"
+            f"Te confirmamos que formas parte del curso {course_name}, "
+            f"comisión {commission_code}.\n\n"
+            "Gimnasio Municipal"
+        )
+        description = "de confirmación"
+    else:
+        subject = f"Inscripción recibida: {course_name}"
+        body = (
+            f"Hola {full_name}:\n\n"
+            f"Recibimos tu inscripción al curso {course_name}, "
+            f"comisión {commission_code}. La adjudicación de vacantes "
+            "se realizará según el criterio del curso.\n\n"
+            "Gimnasio Municipal"
+        )
+        description = "de inscripción"
+
+    sent, detail = notifications.send_email(email or "", subject, body)
+    if sent:
+        return f"Correo {description} enviado a {full_name}."
+    return f"AVISO: no se pudo enviar correo a {full_name}: {detail}"
+
+
+def get_export_data(
+    table_name: str,
+    columns: tuple[str, ...],
+) -> tuple[tuple[str, ...], list[tuple]]:
+    """Devuelve encabezados y filas de columnas permitidas de una tabla."""
+    if table_name not in EXPORT_COLUMNS:
+        raise ValueError("La tabla seleccionada no está habilitada para exportación.")
+    if not columns or any(column not in EXPORT_COLUMNS[table_name] for column in columns):
+        raise ValueError("Seleccione al menos una columna válida para exportar.")
+
+    selected_columns = ", ".join(f'"{column}"' for column in columns)
+    rows = execute_query(
+        f'SELECT {selected_columns} FROM "{table_name}" ORDER BY 1',
+        fetch=True,
+    )
+    return columns, rows
 
 # --- VALIDACIONES Y DISPONIBILIDAD DE CUPOS ---
 
@@ -215,6 +292,12 @@ def register_new_applicant(
         result = _register_applicant(cursor, id_persona, id_comision)
         if result[0]:
             conn.commit()
+            cursor.execute(
+                "SELECT id_inscripcion FROM Inscripcion WHERE id_persona = ? AND id_comision = ?",
+                (id_persona, id_comision),
+            )
+            inscription_id = cursor.fetchone()[0]
+            result = (True, f"{result[1]} {_send_enrollment_email(inscription_id)}")
         else:
             conn.rollback()
         return result
@@ -304,6 +387,7 @@ def delete_person(id_persona: int):
         cursor.execute("DELETE FROM Persona WHERE id_persona = ?", (id_persona,))
 
         promoted_msg = ""
+        promoted_id = None
         if estado == 1 and comm_id:
             cursor.execute(
                 """
@@ -320,9 +404,12 @@ def delete_person(id_persona: int):
             if next_app:
                 next_id, n_nom, n_ape, n_dni = next_app
                 cursor.execute("UPDATE Inscripcion SET estado = 1 WHERE id_inscripcion = ?", (next_id,))
+                promoted_id = next_id
                 promoted_msg = f" Su vacante en {comm_code} fue otorgada a {n_nom} {n_ape} (DNI {n_dni}) de la lista de espera."
 
         conn.commit()
+        if promoted_id is not None:
+            promoted_msg += f" {_send_enrollment_email(promoted_id, confirmed=True)}"
         return True, f"Baja realizada para {p_nom} {p_ape} (DNI {p_dni}).{promoted_msg}"
     except sqlite3.Error as error:
         conn.rollback()
@@ -604,6 +691,7 @@ def change_commission_registration(dni: str, new_id_comision: int):
 
         # Si era titular, promover al siguiente en espera en la comisión origen
         promoted_msg = ""
+        promoted_id = None
         if old_estado == 1:
             cursor.execute(
                 """
@@ -620,9 +708,12 @@ def change_commission_registration(dni: str, new_id_comision: int):
             if next_app:
                 next_id, n_nom, n_ape, n_dni = next_app
                 cursor.execute("UPDATE Inscripcion SET estado = 1 WHERE id_inscripcion = ?", (next_id,))
+                promoted_id = next_id
                 promoted_msg = f" Su vacante en {old_code} fue asignada a {n_nom} {n_ape} (DNI {n_dni})."
 
         conn.commit()
+        if promoted_id is not None:
+            promoted_msg += f" {_send_enrollment_email(promoted_id, confirmed=True)}"
         return True, f"Reasignación confirmada para {p_nom} {p_ape}. Pasa a la nueva comisión en lista de espera.{promoted_msg}"
     except sqlite3.Error as err:
         conn.rollback()
@@ -661,6 +752,7 @@ def cancel_registration_by_dni(dni: str):
         cursor.execute("DELETE FROM Inscripcion WHERE id_inscripcion = ?", (id_inscripcion,))
 
         promoted_msg = ""
+        promoted_id = None
         if estado == 1:
             cursor.execute(
                 """
@@ -677,9 +769,12 @@ def cancel_registration_by_dni(dni: str):
             if next_app:
                 next_id, n_nom, n_ape, n_dni = next_app
                 cursor.execute("UPDATE Inscripcion SET estado = 1 WHERE id_inscripcion = ?", (next_id,))
+                promoted_id = next_id
                 promoted_msg = f" Su vacante titular fue asignada a {n_nom} {n_ape} (DNI {n_dni}) de la lista de espera."
 
         conn.commit()
+        if promoted_id is not None:
+            promoted_msg += f" {_send_enrollment_email(promoted_id, confirmed=True)}"
         return True, f"Inscripción cancelada para {p_nom} {p_ape} en {course_name} ({comm_code}).{promoted_msg}"
     except sqlite3.Error as err:
         conn.rollback()
@@ -754,6 +849,8 @@ def deregister_admitted_applicant(dni):
             )
 
         conn.commit()
+        if next_applicant:
+            message += f" {_send_enrollment_email(inscription_id, confirmed=True)}"
         return True, message
     except sqlite3.Error as error:
         conn.rollback()
@@ -840,8 +937,14 @@ def run_lottery_assignment():
 
         for w_id in winners:
             execute_query("UPDATE Inscripcion SET estado = 1 WHERE id_inscripcion = ?", (w_id,))
+        email_results = [
+            _send_enrollment_email(w_id, confirmed=True) for w_id in winners
+        ]
         total_assigned += k
-        details.append(f"Comisión {codigo} ({nombre_curso}): {k} titular(es) asignado(s).")
+        details.append(
+            f"Comisión {codigo} ({nombre_curso}): {k} titular(es) asignado(s).\n"
+            + "\n".join(f"  - {result}" for result in email_results)
+        )
 
     return total_assigned, details
 
@@ -883,8 +986,14 @@ def run_fifo_assignment():
 
         for a_id in assigned_ids:
             execute_query("UPDATE Inscripcion SET estado = 1 WHERE id_inscripcion = ?", (a_id,))
+        email_results = [
+            _send_enrollment_email(a_id, confirmed=True) for a_id in assigned_ids
+        ]
         total_assigned += len(assigned_ids)
-        details.append(f"Comisión {codigo} ({nombre_curso}): {len(assigned_ids)} titular(es) asignado(s).")
+        details.append(
+            f"Comisión {codigo} ({nombre_curso}): {len(assigned_ids)} titular(es) asignado(s).\n"
+            + "\n".join(f"  - {result}" for result in email_results)
+        )
 
     return total_assigned, details
 

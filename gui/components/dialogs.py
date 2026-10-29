@@ -1,11 +1,14 @@
 """
 Diálogos modales y formularios interactivos para la GUI de Tkinter.
-Gimnasio Municipal - Versión 3.0.0
+Gimnasio Municipal - Versión 3.1.0
 Desarrollado por: L. M. OCARIZ ARRIETA
 """
 
+import csv
+import os
+import sqlite3
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import operations
 import validators
 from config import MINIMUM_AGE
@@ -847,3 +850,156 @@ class WaitlistViewerDialog(BaseDialog):
         for idx, row in enumerate(self.waitlist, start=1):
             # row: dni, nombre, apellido, com_codigo, fecha_hora, curso_nombre, id_insc
             self.tree.insert("", "end", values=(f"#{idx:02d}", row[0], row[1], row[2], row[4]))
+
+
+class ExportCsvDialog(BaseDialog):
+    """Permite elegir campos y exportar tablas completas a archivos CSV."""
+
+    TABLE_LABELS = {
+        "Curso": "Cursos",
+        "Comision": "Comisiones",
+        "Persona": "Personas (incluye datos personales)",
+        "Inscripcion": "Inscripciones",
+    }
+    COLUMN_LABELS = {
+        "id_curso": "ID de curso",
+        "nombre": "Nombre",
+        "criterio": "Criterio de selección",
+        "edad_minima": "Edad mínima",
+        "cupo_maximo": "Cupo máximo",
+        "id_comision": "ID de comisión",
+        "codigo": "Código",
+        "cupo_total": "Cupo total",
+        "cupo_seleccion": "Cupo de selección",
+        "id_persona": "ID de persona",
+        "dni": "DNI",
+        "apellido": "Apellido",
+        "fecha_nac": "Fecha de nacimiento",
+        "direccion": "Dirección",
+        "localidad": "Localidad",
+        "telefono": "Teléfono",
+        "email": "Correo electrónico",
+        "id_inscripcion": "ID de inscripción",
+        "fecha_hora": "Fecha y hora",
+        "estado": "Estado (0 espera, 1 admitido)",
+    }
+    FILE_NAMES = {
+        "Curso": "cursos.csv",
+        "Comision": "comisiones.csv",
+        "Persona": "personas.csv",
+        "Inscripcion": "inscripciones.csv",
+    }
+
+    def __init__(self, parent: tk.Misc) -> None:
+        super().__init__(parent, "Exportar tablas a CSV", width=620, height=620)
+        self.column_vars = {}
+
+        tk.Label(
+            self.main_container,
+            text="Seleccioná las tablas y columnas que querés exportar",
+            font=FONT_TITLE,
+            bg=BG_MAIN,
+            fg=COLOR_PRIMARY,
+        ).pack(anchor="w", pady=(0, 6))
+        tk.Label(
+            self.main_container,
+            text=(
+                "Se exportan todos los registros de cada tabla elegida, en un CSV "
+                "por tabla. La exportación de Personas contiene datos personales."
+            ),
+            font=FONT_SMALL,
+            bg=BG_MAIN,
+            fg=TEXT_MUTED,
+            wraplength=560,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 10))
+
+        for table_name, table_columns in operations.EXPORT_COLUMNS.items():
+            group = tk.LabelFrame(
+                self.main_container,
+                text=self.TABLE_LABELS[table_name],
+                font=FONT_BODY_BOLD,
+                bg=BG_CARD,
+                padx=10,
+                pady=6,
+            )
+            group.pack(fill="x", pady=(0, 8))
+            self.column_vars[table_name] = {}
+            for column in table_columns:
+                selected = tk.BooleanVar(value=False)
+                self.column_vars[table_name][column] = selected
+                ttk.Checkbutton(
+                    group,
+                    text=self.COLUMN_LABELS[column],
+                    variable=selected,
+                ).pack(anchor="w")
+
+        buttons = tk.Frame(self.main_container, bg=BG_MAIN)
+        buttons.pack(fill="x", pady=(8, 0))
+        ttk.Button(buttons, text="Cancelar", command=self.destroy).pack(side="right")
+        ttk.Button(
+            buttons,
+            text="Exportar CSV",
+            style="Primary.TButton",
+            command=self.export,
+        ).pack(side="right", padx=(0, 6))
+
+    def export(self) -> None:
+        """Exporta las columnas marcadas a archivos CSV en una carpeta elegida."""
+        selections = {
+            table_name: tuple(
+                column
+                for column, selected in column_vars.items()
+                if selected.get()
+            )
+            for table_name, column_vars in self.column_vars.items()
+        }
+        selections = {
+            table_name: columns
+            for table_name, columns in selections.items()
+            if columns
+        }
+        if not selections:
+            messagebox.showwarning(
+                "Selección requerida",
+                "Marcá al menos una columna de una tabla.",
+                parent=self,
+            )
+            return
+
+        directory = filedialog.askdirectory(parent=self, title="Elegir carpeta de destino")
+        if not directory:
+            return
+
+        target_paths = [
+            os.path.join(directory, self.FILE_NAMES[table_name])
+            for table_name in selections
+        ]
+        existing_paths = [path for path in target_paths if os.path.exists(path)]
+        if existing_paths and not messagebox.askyesno(
+            "Confirmar reemplazo",
+            "Ya existen uno o más archivos CSV en esa carpeta. ¿Querés reemplazarlos?",
+            parent=self,
+        ):
+            return
+
+        try:
+            exported = []
+            for table_name, columns in selections.items():
+                headers, rows = operations.get_export_data(table_name, columns)
+                path = os.path.join(directory, self.FILE_NAMES[table_name])
+                with open(path, "w", newline="", encoding="utf-8-sig") as csv_file:
+                    writer = csv.writer(csv_file)
+                    writer.writerow(headers)
+                    writer.writerows(rows)
+                exported.append(f"{self.FILE_NAMES[table_name]}: {len(rows)} filas")
+        except (OSError, sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Error de exportación", str(error), parent=self)
+            return
+
+        messagebox.showinfo(
+            "Exportación completada",
+            "Archivos generados:\n" + "\n".join(exported),
+            parent=self,
+        )
+        self.destroy()

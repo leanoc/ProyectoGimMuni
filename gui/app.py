@@ -1,6 +1,6 @@
 """
 Ventana Principal y Controlador de la GUI en Tkinter.
-Gimnasio Municipal - Versión 3.0.0
+Gimnasio Municipal - Versión 3.1.0
 Desarrollado por: L. M. OCARIZ ARRIETA
 """
 
@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import database
 import operations
+from config import APP_TITLE, APP_VERSION, APP_DEVELOPER
 from gui.theme import (
     setup_theme, center_window, BG_MAIN, BG_CARD, BG_SIDEBAR,
     BG_SIDEBAR_HOVER, BG_SIDEBAR_ACTIVE, SIDEBAR_ACCENT,
@@ -20,6 +21,7 @@ from gui.views.courses_view import CoursesView
 from gui.views.commissions_view import CommissionsView
 from gui.views.persons_view import PersonsView
 from gui.views.selections_view import SelectionsView
+from gui.components.dialogs import ExportCsvDialog
 
 class GymApp(tk.Tk):
     def __init__(self):
@@ -154,11 +156,16 @@ class GymApp(tk.Tk):
 
         tk.Label(
             footer_frame,
-            text="Versión 3.0.0 (Tkinter GUI)",
+            text=f"Versión {APP_VERSION} (Tkinter GUI)",
             font=FONT_SMALL,
             bg=BG_SIDEBAR,
             fg=TEXT_SIDEBAR_MUTED
         ).pack(anchor="w")
+        ttk.Button(
+            footer_frame,
+            text="Acerca de...",
+            command=self.show_about,
+        ).pack(anchor="w", pady=(8, 0))
 
         # 2. Contenedor de Contenido (Lado derecho)
         self.right_container = tk.Frame(self, bg=BG_MAIN)
@@ -177,6 +184,12 @@ class GymApp(tk.Tk):
             fg=TEXT_MAIN
         )
         self.lbl_top_title.pack(side="left", pady=12)
+
+        ttk.Button(
+            top_bar,
+            text="Exportar CSV",
+            command=self.open_export_dialog,
+        ).pack(side="right", padx=(8, 0), pady=10)
 
         # Badge de estado del sistema
         badge_frame = tk.Frame(top_bar, bg="#ECFDF5", padx=10, pady=4)
@@ -221,6 +234,27 @@ class GymApp(tk.Tk):
         )
         self.content_area.bind("<Configure>", self._configure_content_area)
         self.content_canvas.bind("<Configure>", self._configure_content_area)
+
+    def open_export_dialog(self) -> None:
+        """Abre el selector de tablas y campos para exportación CSV."""
+        ExportCsvDialog(self)
+
+    def show_about(self) -> None:
+        """Muestra los datos conocidos del proyecto y su contexto educativo."""
+        messagebox.showinfo(
+            "Acerca de...",
+            (
+                f"{APP_TITLE}\n"
+                f"Versión {APP_VERSION}\n\n"
+                "Proyecto grupal/de curso desarrollado en el marco del Curso de "
+                "Programación dictado durante 2026 en el CFP N.º 402 de Berisso.\n\n"
+                "Aplicación académica para gestionar cursos, inscripciones, "
+                "comisiones y adjudicación de vacantes.\n\n"
+                f"Desarrollo: {APP_DEVELOPER}\n"
+                "Tecnologías: Python, Tkinter y SQLite."
+            ),
+            parent=self,
+        )
 
     def _configure_content_area(self, event: tk.Event) -> None:
         content_width = max(event.width, self.content_area.winfo_reqwidth())

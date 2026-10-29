@@ -1,6 +1,6 @@
 """
 Vista de Panel de Control (Dashboard) con Métricas y Accesos Rápidos.
-Gimnasio Municipal - Versión 3.0.0
+Gimnasio Municipal - Versión 3.1.0
 Desarrollado por: L. M. OCARIZ ARRIETA
 """
 

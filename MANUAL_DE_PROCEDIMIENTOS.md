@@ -1,6 +1,6 @@
 # Manual de Procedimientos - Sistema de Inscripción y Sorteo
 ## Gimnasio Municipal 🏊‍♂️🏋️‍♀️
-### **Versión 3.0.0 (Interfaz Gráfica de Escritorio con Tkinter)**
+### **Versión 3.1.0 (Interfaz Gráfica de Escritorio con Tkinter)**
 **Desarrollado por: L. M. OCARIZ ARRIETA**
 
 ---
@@ -9,7 +9,7 @@
 
 El presente manual describe los procedimientos operativos para el correcto uso del **Sistema de Inscripción y Sorteo del Gimnasio Municipal**, actualizado con su **interfaz gráfica moderna de escritorio (GUI)** construida íntegramente con Python y Tkinter/ttk.
 
-El sistema permite gestionar de forma visual e intuitiva el ciclo de vida de los cursos deportivos (Natación, Gimnasia Acuática, Fútbol, Atletismo u otros), el control estricto de cupos y vacantes por comisión, el padrón general de postulantes y la adjudicación transparente de vacantes titulares (mediante Sorteo Aleatorio o por estricto Orden de Llegada FIFO) y sus respectivas Listas de Espera con promoción automática.
+El sistema permite gestionar de forma visual e intuitiva el ciclo de vida de los cursos deportivos (Natación, Gimnasia Acuática, Fútbol, Atletismo u otros), el control estricto de cupos y vacantes por comisión, el padrón general de postulantes y la adjudicación transparente de vacantes titulares (mediante Sorteo Aleatorio o por estricto Orden de Llegada FIFO) y sus respectivas Listas de Espera con promoción automática. También incluye exportación CSV configurable y notificaciones por correo.
 
 ---
 
@@ -82,8 +82,9 @@ La aplicación cuenta con una **Barra Lateral Izquierda (Sidebar)** de diseño o
 │ 👥  Comisiones y Cupos          │                                                       │
 │ 📝  Personas e Inscripción      │                                                       │
 │ 🎲  Sorteos y Adjudicación      │                                                       │
+│ Exportar CSV                    │                                                       │
 ├─────────────────────────────────┤                                                       │
-│ Versión 3.0.0 (Tkinter)         │                                                       │
+│ Versión 3.1.0 (Tkinter)         │                                                       │
 │ Dev: L. M. OCARIZ ARRIETA       │                                                       │
 └─────────────────────────────────┴───────────────────────────────────────────────────────┘
 ```
@@ -225,7 +226,7 @@ Este procedimiento aplica la política *fail-fast* para no solicitar datos innec
 2. El sistema presentará dos modalidades de baja para elegir:
    - **Opción A (Cancelar solo la inscripción):** Da de baja la participación en el curso pero conserva la ficha de la persona en el padrón para futuros ciclos.
    - **Opción B (Eliminar completamente del sistema):** Elimina el registro personal y su inscripción de la base de datos.
-3. **Promoción de Lista de Espera:** Si la persona dada de baja era titular (`estado = 1`), el siguiente postulante en espera por orden cronológico pasa inmediatamente a ocupar la titularidad como admitido, notificando su nombre por pantalla.
+3. **Promoción de Lista de Espera:** Si la persona dada de baja era titular (`estado = 1`), el siguiente postulante en espera por orden cronológico pasa inmediatamente a ocupar la titularidad como admitido, notificando su nombre por pantalla e intentando enviarle una confirmación por correo.
 
 ---
 
@@ -239,12 +240,14 @@ Este módulo centraliza la asignación de vacantes titulares y la inspección ge
 3. Haga clic en el botón **🎲 Ejecutar Sorteo Aleatorio**.
 4. El sistema verificará los cupos de selección de cada comisión del curso, seleccionará al azar (`random.sample`) entre los inscriptos en espera hasta agotar las vacantes disponibles y los ascenderá a condición de admitidos.
 5. Se presentará un diálogo resumen con el total de adjudicados y los resultados se reflejarán instantáneamente en la tabla inferior.
+6. Se genera la notificación por correo a cada nuevo titular; si no se puede abrir el cliente de correo, el resumen indica el aviso sin deshacer la adjudicación.
 
 #### 5.2 Adjudicación por Orden de Llegada (FIFO)
 1. En el panel derecho (*Adjudicación por Orden de Llegada*), seleccione el curso configurado con criterio por llegada (ej. *Gimnasia Acuática*).
 2. Haga clic en el botón **⏱️ Asignar por Orden de Llegada**.
 3. El sistema ordenará estrictamente por `fecha_hora` a los inscriptos de cada comisión y asignará la titularidad a los primeros hasta cubrir el cupo de selección establecido.
 4. Los restantes postulantes permanecerán ordenados en lista de espera.
+5. Se genera la notificación de confirmación a cada nuevo titular; si no se puede abrir el cliente de correo, el resumen indica el aviso sin deshacer la adjudicación.
 
 #### 5.3 Inspector de Resultados y Listas de Espera
 En la parte inferior de la vista se encuentra el inspector general:
@@ -257,7 +260,29 @@ En la parte inferior de la vista se encuentra el inspector general:
 
 ---
 
-## 6. Matriz de Manejo de Errores y Excepciones
+## 6. Exportación CSV, correos y acerca de
+
+### Exportar tablas
+1. Presione **Exportar CSV** en la barra superior.
+2. Marque las tablas y columnas deseadas. Se exportan todos los registros de las tablas elegidas, con un archivo independiente por tabla.
+3. Elija la carpeta de destino. Si ya existen archivos con esos nombres, confirme si desea reemplazarlos.
+4. Se generan `cursos.csv`, `comisiones.csv`, `personas.csv` o `inscripciones.csv`, según la selección.
+
+La tabla Personas contiene datos personales. Proteja los archivos y compártalos solo con personas autorizadas.
+
+### Notificaciones por correo (`mailto`)
+El sistema utiliza el protocolo estándar `mailto:` para abrir automáticamente la aplicación de correo predeterminada del sistema operativo (por ejemplo Outlook, Thunderbird o webmail predeterminado) con el destinatario, asunto y plantilla del mensaje precargados.
+
+- **Sin configuración requerida:** No requiere configurar variables de entorno, servidores SMTP ni almacenar contraseñas.
+- Se genera un comprobante al inscribirse y una confirmación al convertirse en titular por sorteo, FIFO o reemplazo de una baja. Si el cliente de correo no se puede abrir o el destinatario es inválido, la aplicación muestra una advertencia informativa y la inscripción/adjudicación permanece guardada de forma segura.
+
+
+### Acerca de...
+El botón **Acerca de...**, al pie de la barra lateral, informa el contexto educativo: proyecto grupal/de curso del Curso de Programación dictado en 2026 en el CFP N.º 402 de Berisso.
+
+---
+
+## 7. Matriz de Manejo de Errores y Excepciones
 
 | Situación Detectada | Comportamiento del Sistema en la GUI | Acción Sugerida |
 | :--- | :--- | :--- |
@@ -269,20 +294,11 @@ En la parte inferior de la vista se encuentra el inspector general:
 
 ---
 
-## 7. Verificación de Integridad mediante Pruebas Automatizadas
+## 8. Verificación de Integridad mediante Pruebas Automatizadas
 
-El proyecto incluye 17 pruebas unitarias completas en `test_gym.py` que validan todas las reglas de negocio, operaciones de base de datos, lógica de cupos y reemplazos automáticos sin tocar la base real de producción (`system.db`).
+Las pruebas unitarias de `test_gym.py` validan reglas de negocio, operaciones de base de datos, exportación y reemplazos automáticos sin tocar la base real de producción (`system.db`).
 
 Para correrlas en cualquier momento:
 ```bash
 python -m unittest test_gym.py
-```
-
-Salida esperada:
-```text
-.................
-----------------------------------------------------------------------
-Ran 17 tests in 1.2s
-
-OK
 ```
