@@ -400,6 +400,17 @@ class RegisterApplicantDialog(BaseDialog):
         self.ent_tel = ttk.Entry(f_tel)
         self.ent_tel.pack(fill="x")
 
+        tk.Label(
+            f_pers, text="Sexo (opcional):", font=FONT_BODY_BOLD, bg=BG_CARD
+        ).pack(anchor="w")
+        self.cb_sexo = ttk.Combobox(
+            f_pers,
+            values=("Sin especificar", "Hombre", "Mujer"),
+            state="readonly",
+        )
+        self.cb_sexo.set("Sin especificar")
+        self.cb_sexo.pack(fill="x", pady=(0, 6))
+
         # Fila Dirección y Localidad
         f_dir_loc = tk.Frame(f_pers, bg=BG_CARD)
         f_dir_loc.pack(fill="x", pady=(0, 6))
@@ -477,6 +488,7 @@ class RegisterApplicantDialog(BaseDialog):
             self.ent_tel.insert(0, p[7])
             self.ent_email.delete(0, tk.END)
             self.ent_email.insert(0, p[8])
+            self.cb_sexo.set(p[9] or "Sin especificar")
             self.lbl_dni_status.config(text="✓ Persona encontrada en padrón.", fg=COLOR_SUCCESS)
         else:
             self.lbl_dni_status.config(text="Nuevo postulante (no registrado).", fg=TEXT_MUTED)
@@ -528,7 +540,8 @@ class RegisterApplicantDialog(BaseDialog):
             return
 
         ok, msg = operations.register_new_applicant(
-            dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email, id_comision
+            dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email,
+            id_comision, self.cb_sexo.get(),
         )
 
         if ok:
@@ -583,6 +596,16 @@ class EditPersonDialog(BaseDialog):
         self.ent_fecha.insert(0, str(person_tuple[4]))
         self.ent_fecha.pack(fill="x", pady=(0, 6))
 
+        tk.Label(form_frame, text="Sexo:", font=FONT_BODY_BOLD, bg=BG_CARD).pack(anchor="w", pady=(2, 2))
+        self.cb_sexo = ttk.Combobox(
+            form_frame,
+            values=("Sin especificar", "Hombre", "Mujer"),
+            state="readonly",
+        )
+        sexo_actual = person_tuple[16] if len(person_tuple) > 16 else "Sin especificar"
+        self.cb_sexo.set(sexo_actual or "Sin especificar")
+        self.cb_sexo.pack(fill="x", pady=(0, 6))
+
         tk.Label(form_frame, text="Dirección:", font=FONT_BODY_BOLD, bg=BG_CARD).pack(anchor="w", pady=(2, 2))
         self.ent_dir = ttk.Entry(form_frame)
         self.ent_dir.insert(0, str(person_tuple[5]) if person_tuple[5] else "")
@@ -631,7 +654,8 @@ class EditPersonDialog(BaseDialog):
         email = self.ent_email.get().strip()
 
         ok, msg = operations.update_person(
-            self.person[0], dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email
+            self.person[0], dni, nombre, apellido, fecha_nac, direccion, localidad,
+            telefono, email, self.cb_sexo.get(),
         )
         if ok:
             messagebox.showinfo("Éxito", msg, parent=self)
@@ -879,6 +903,7 @@ class ExportCsvDialog(BaseDialog):
         "localidad": "Localidad",
         "telefono": "Teléfono",
         "email": "Correo electrónico",
+        "sexo": "Sexo",
         "id_inscripcion": "ID de inscripción",
         "fecha_hora": "Fecha y hora",
         "estado": "Estado (0 espera, 1 admitido)",

@@ -1,5 +1,18 @@
 # Historial de cambios
 
+## [En desarrollo]
+
+### Agregado
+- Historial persistente de movimientos con exportación a CSV y PDF.
+- Vista de estadísticas generales y desglosadas por curso.
+- Creación de copias de seguridad desde la interfaz.
+- Botón de consulta contextual en cada vista.
+- Capturas reales de las siete vistas en el manual de procedimientos.
+
+### Actualizado
+- La ventana «Acerca de...» ya no muestra detalles técnicos.
+- El manual incorpora instrucciones y capturas actuales de cada vista.
+
 ## [3.1.0] - 2026-10-23
 
 ### Agregado

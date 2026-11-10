@@ -61,7 +61,9 @@ def create_tables():
             direccion TEXT,
             localidad TEXT,
             telefono TEXT,
-            email TEXT
+            email TEXT,
+            sexo TEXT NOT NULL DEFAULT 'Sin especificar'
+                CHECK (sexo IN ('Hombre', 'Mujer', 'Sin especificar'))
         );
         """,
         """
@@ -74,6 +76,106 @@ def create_tables():
             FOREIGN KEY (id_persona) REFERENCES Persona(id_persona) ON DELETE CASCADE,
             FOREIGN KEY (id_comision) REFERENCES Comision(id_comision) ON DELETE CASCADE
         );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS Movimiento (
+            id_movimiento INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha_hora DATETIME NOT NULL DEFAULT (datetime(CURRENT_TIMESTAMP, 'localtime')),
+            entidad TEXT NOT NULL,
+            accion TEXT NOT NULL,
+            detalle TEXT NOT NULL
+        );
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS curso_movimiento_insert
+        AFTER INSERT ON Curso BEGIN
+            INSERT INTO Movimiento (entidad, accion, detalle)
+            VALUES ('Curso', 'Alta', 'Curso creado: ' || NEW.nombre);
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS curso_movimiento_update
+        AFTER UPDATE ON Curso BEGIN
+            INSERT INTO Movimiento (entidad, accion, detalle)
+            VALUES ('Curso', 'Modificación', 'Curso actualizado: ' || NEW.nombre);
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS curso_movimiento_delete
+        AFTER DELETE ON Curso BEGIN
+            INSERT INTO Movimiento (entidad, accion, detalle)
+            VALUES ('Curso', 'Baja', 'Curso eliminado: ' || OLD.nombre);
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS comision_movimiento_insert
+        AFTER INSERT ON Comision BEGIN
+            INSERT INTO Movimiento (entidad, accion, detalle)
+            VALUES ('Comisión', 'Alta', 'Comisión creada: ' || NEW.codigo);
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS comision_movimiento_update
+        AFTER UPDATE ON Comision BEGIN
+            INSERT INTO Movimiento (entidad, accion, detalle)
+            VALUES ('Comisión', 'Modificación', 'Comisión actualizada: ' || NEW.codigo);
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS comision_movimiento_delete
+        AFTER DELETE ON Comision BEGIN
+            INSERT INTO Movimiento (entidad, accion, detalle)
+            VALUES ('Comisión', 'Baja', 'Comisión eliminada: ' || OLD.codigo);
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS persona_movimiento_insert
+        AFTER INSERT ON Persona BEGIN
+            INSERT INTO Movimiento (entidad, accion, detalle)
+            VALUES ('Persona', 'Alta', 'Ficha de persona creada (ID ' || NEW.id_persona || ').');
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS persona_movimiento_update
+        AFTER UPDATE ON Persona BEGIN
+            INSERT INTO Movimiento (entidad, accion, detalle)
+            VALUES ('Persona', 'Modificación', 'Ficha de persona actualizada (ID ' || NEW.id_persona || ').');
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS persona_movimiento_delete
+        AFTER DELETE ON Persona BEGIN
+            INSERT INTO Movimiento (entidad, accion, detalle)
+            VALUES ('Persona', 'Baja', 'Ficha de persona eliminada (ID ' || OLD.id_persona || ').');
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS inscripcion_movimiento_insert
+        AFTER INSERT ON Inscripcion BEGIN
+            INSERT INTO Movimiento (entidad, accion, detalle)
+            VALUES ('Inscripción', 'Alta', 'Inscripción creada (ID ' || NEW.id_inscripcion || ', comisión ' || NEW.id_comision || ').');
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS inscripcion_movimiento_update
+        AFTER UPDATE ON Inscripcion BEGIN
+            INSERT INTO Movimiento (entidad, accion, detalle)
+            VALUES (
+                'Inscripción',
+                CASE WHEN OLD.estado != NEW.estado AND NEW.estado = 1 THEN 'Adjudicación'
+                     WHEN OLD.id_comision != NEW.id_comision THEN 'Reasignación'
+                     ELSE 'Modificación' END,
+                'Inscripción ' || NEW.id_inscripcion || ': comisión ' || OLD.id_comision || ' a ' || NEW.id_comision ||
+                ', estado ' || OLD.estado || ' a ' || NEW.estado || '.'
+            );
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS inscripcion_movimiento_delete
+        AFTER DELETE ON Inscripcion BEGIN
+            INSERT INTO Movimiento (entidad, accion, detalle)
+            VALUES ('Inscripción', 'Baja', 'Inscripción eliminada (ID ' || OLD.id_inscripcion || ', comisión ' || OLD.id_comision || ').');
+        END;
         """
     ]
     conn = connect_db()
@@ -81,6 +183,13 @@ def create_tables():
     try:
         for q in queries:
             cursor.execute(q)
+        person_columns = {
+            row[1] for row in cursor.execute("PRAGMA table_info(Persona)").fetchall()
+        }
+        if "sexo" not in person_columns:
+            cursor.execute(
+                "ALTER TABLE Persona ADD COLUMN sexo TEXT NOT NULL DEFAULT 'Sin especificar'"
+            )
         conn.commit()
     finally:
         disconnect_db(conn)

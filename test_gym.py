@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import validators
 import database
 import operations
+import reports
 import config
 import notifications
 from seed import setup_base_data
@@ -144,6 +145,114 @@ class TestOperations(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             operations.get_export_data("Persona", ("password",))
+
+    def test_movements_are_recorded_and_exportable(self):
+        created, message = operations.create_course("Curso historial", "Sorteo", 16, 1)
+        self.assertTrue(created, message)
+        course_id = database.execute_query(
+            "SELECT id_curso FROM Curso WHERE nombre = ?",
+            ("Curso historial",),
+            fetch=True,
+        )[0][0]
+        updated, message = operations.update_course(course_id, "Curso historial editado", "Sorteo", 16, 1)
+        self.assertTrue(updated, message)
+        deleted, message = operations.delete_course(course_id)
+        self.assertTrue(deleted, message)
+
+        success, message = operations.register_new_applicant(
+            "76543210", "Historial", "Prueba", "1990-01-01",
+            "Calle 1", "Berisso", "1234", "history@example.com", 1,
+        )
+        self.assertTrue(success, message)
+        history = operations.get_movement_history()
+        self.assertTrue(any(row[1] == "Inscripción" and row[2] == "Alta" for row in history))
+
+        with tempfile.TemporaryDirectory() as directory:
+            csv_path = os.path.join(directory, "historial.csv")
+            pdf_path = os.path.join(directory, "historial.pdf")
+            reports.export_history_csv(csv_path, history)
+            reports.export_history_pdf(pdf_path, history * 6)
+
+            with open(csv_path, encoding="utf-8-sig", newline="") as csv_file:
+                self.assertIn("Fecha y hora", csv_file.readline())
+            with open(pdf_path, "rb") as pdf_file:
+                pdf_data = pdf_file.read()
+            self.assertTrue(pdf_data.startswith(b"%PDF-1.4"))
+            self.assertTrue(pdf_data.endswith(b"%%EOF\n"))
+            xref_offset = int(pdf_data.rsplit(b"startxref\n", 1)[1].splitlines()[0])
+            self.assertEqual(pdf_data[xref_offset:xref_offset + 5], b"xref\n")
+            self.assertIn(b"/Count 2", pdf_data)
+
+    def test_backup_copies_a_readable_database(self):
+        with tempfile.TemporaryDirectory() as directory:
+            backup_path = os.path.join(directory, "respaldo.db")
+            self.assertEqual(operations.backup_database(backup_path), backup_path)
+            backup = sqlite3.connect(backup_path)
+            try:
+                course_count = backup.execute("SELECT COUNT(*) FROM Curso").fetchone()[0]
+            finally:
+                backup.close()
+            self.assertGreater(course_count, 0)
+
+        with self.assertRaises(ValueError):
+            operations.backup_database(database.DB_PATH)
+
+    def test_course_statistics_count_commissions_and_registrations(self):
+        success, message = operations.register_new_applicant(
+            "76543211", "Estadistica", "Prueba", "1990-01-01",
+            "Calle 1", "Berisso", "1234", "stats@example.com", 1, "Mujer",
+        )
+        self.assertTrue(success, message)
+        statistics = {row[0]: row[1:] for row in operations.get_course_statistics()}
+        self.assertIn("Natación", statistics)
+        enrolled, admitted, waiting, commissions, seats, course_limit, commission_limit = statistics["Natación"]
+        self.assertGreaterEqual(enrolled, 1)
+        self.assertEqual(admitted + waiting, enrolled)
+        self.assertGreater(commissions, 0)
+        self.assertGreater(seats, 0)
+        self.assertGreater(course_limit, 0)
+        self.assertGreater(commission_limit, 0)
+        self.assertEqual(
+            dict(operations.get_gender_statistics()),
+            {"Hombre": 0, "Mujer": 1, "Sin especificar": 0},
+        )
+
+    def test_existing_database_migration_adds_unspecified_gender(self):
+        with tempfile.TemporaryDirectory() as directory:
+            legacy_path = os.path.join(directory, "legacy.db")
+            original_path = database.DB_PATH
+            database.DB_PATH = legacy_path
+            try:
+                conn = sqlite3.connect(legacy_path)
+                conn.execute(
+                    """
+                    CREATE TABLE Persona (
+                        id_persona INTEGER PRIMARY KEY,
+                        dni TEXT UNIQUE NOT NULL,
+                        nombre TEXT NOT NULL,
+                        apellido TEXT NOT NULL,
+                        fecha_nac DATE NOT NULL,
+                        direccion TEXT,
+                        localidad TEXT,
+                        telefono TEXT,
+                        email TEXT
+                    )
+                    """
+                )
+                conn.execute(
+                    "INSERT INTO Persona (dni, nombre, apellido, fecha_nac) VALUES ('12345678', 'Ana', 'Ejemplo', '1990-01-01')"
+                )
+                conn.commit()
+                conn.close()
+
+                database.create_tables()
+                migrated_gender = database.execute_query(
+                    "SELECT sexo FROM Persona WHERE dni = '12345678'",
+                    fetch=True,
+                )[0][0]
+                self.assertEqual(migrated_gender, "Sin especificar")
+            finally:
+                database.DB_PATH = original_path
 
     def test_assignments_send_confirmation_to_new_admitted_people(self):
         with patch(
@@ -418,13 +527,14 @@ class TestOperations(unittest.TestCase):
         # Update person 1 with a valid unique new DNI and new address
         ok, msg = operations.update_person(
             person1_id, "90000099", "Ana Mod", "Gomez Mod", "1998-04-12",
-            "Calle Nueva 456", "La Plata", "221999", "ana_mod@test.com"
+            "Calle Nueva 456", "La Plata", "221999", "ana_mod@test.com", "Mujer"
         )
         self.assertTrue(ok, msg)
         updated_p1 = operations.get_person_by_id(person1_id)[0]
         self.assertEqual(updated_p1[1], "90000099")
         self.assertEqual(updated_p1[2], "Ana Mod")
         self.assertEqual(updated_p1[5], "Calle Nueva 456")
+        self.assertEqual(updated_p1[9], "Mujer")
 
     def test_waiting_list_and_change_commission(self):
         # Register two applicants in commission 1

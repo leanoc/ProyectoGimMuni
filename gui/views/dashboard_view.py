@@ -34,12 +34,11 @@ class DashboardView(tk.Frame):
 
         tk.Label(
             head_frame,
-            text="📊 Panel de Control y Estadísticas en Tiempo Real",
+            text="📊 Panel de Control",
             font=FONT_TITLE,
             bg=BG_MAIN,
             fg=TEXT_MAIN
         ).pack(side="left")
-
         ttk.Button(
             head_frame,
             text="🔄 Actualizar Datos",
@@ -49,6 +48,8 @@ class DashboardView(tk.Frame):
     def create_kpi_cards(self):
         self.cards_frame = tk.Frame(self, bg=BG_MAIN)
         self.cards_frame.pack(fill="x", pady=(0, 15))
+        for column in range(3):
+            self.cards_frame.columnconfigure(column, weight=1)
 
         # Crear 5 tarjetas métricas
         self.kpi_labels = {}
@@ -69,7 +70,13 @@ class DashboardView(tk.Frame):
                 relief="solid",
                 bd=1
             )
-            card.pack(side="left", fill="x", expand=True, padx=4 if i > 0 else (0, 4))
+            card.grid(
+                row=i // 3,
+                column=i % 3,
+                sticky="ew",
+                padx=(0, 8),
+                pady=(0, 8),
+            )
 
             # Header tarjeta
             h_card = tk.Frame(card, bg=BG_CARD)

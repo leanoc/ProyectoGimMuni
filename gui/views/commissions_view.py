@@ -36,7 +36,6 @@ class CommissionsView(tk.Frame):
             bg=BG_MAIN,
             fg=TEXT_MAIN
         ).pack(side="left")
-
         lbl_desc = tk.Label(
             self,
             text="Control de límites máximos, cupos de selección (titulares), inscriptos y consulta cronológica de lista de espera.",

@@ -1,4 +1,5 @@
 import random
+import os
 import sqlite3
 import database
 from database import execute_query
@@ -12,7 +13,7 @@ EXPORT_COLUMNS = {
     "Comision": ("id_comision", "codigo", "cupo_total", "cupo_seleccion", "id_curso"),
     "Persona": (
         "id_persona", "dni", "nombre", "apellido", "fecha_nac",
-        "direccion", "localidad", "telefono", "email",
+        "direccion", "localidad", "telefono", "email", "sexo",
     ),
     "Inscripcion": (
         "id_inscripcion", "fecha_hora", "estado", "id_persona", "id_comision",
@@ -82,6 +83,37 @@ def get_export_data(
     )
     return columns, rows
 
+
+def get_movement_history():
+    """Retorna los movimientos más recientes primero, sin datos personales sensibles."""
+    return execute_query(
+        """
+        SELECT fecha_hora, entidad, accion, detalle
+        FROM Movimiento
+        ORDER BY id_movimiento DESC
+        """,
+        fetch=True,
+    )
+
+
+def backup_database(destination: str) -> str:
+    """Crea una copia íntegra de la base de datos en la ruta indicada."""
+    source_path = os.path.normcase(os.path.abspath(database.DB_PATH))
+    destination_path = os.path.normcase(os.path.abspath(destination))
+    if source_path == destination_path:
+        raise ValueError("El destino no puede ser el archivo de la base de datos activa.")
+
+    source = database.connect_db()
+    backup = None
+    try:
+        backup = sqlite3.connect(destination)
+        source.backup(backup)
+    finally:
+        if backup is not None:
+            backup.close()
+        source.close()
+    return destination
+
 # --- VALIDACIONES Y DISPONIBILIDAD DE CUPOS ---
 
 def check_commission_availability(id_comision: int, cursor=None):
@@ -149,7 +181,7 @@ def get_person_by_dni(dni):
 def get_person_by_id(id_persona: int):
     """Obtiene todos los atributos de una persona por su ID."""
     query = """
-        SELECT id_persona, dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email
+        SELECT id_persona, dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email, sexo
         FROM Persona WHERE id_persona = ?
     """
     return execute_query(query, (id_persona,), fetch=True)
@@ -230,7 +262,8 @@ def register_applicant(id_persona: int, id_comision: int):
         database.disconnect_db(conn)
 
 def register_new_applicant(
-    dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email, id_comision
+    dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email, id_comision,
+    sexo="Sin especificar",
 ):
     """
     Valida cupos y datos ANTES de registrar a la persona y su inscripción
@@ -243,6 +276,8 @@ def register_new_applicant(
         return False, "Fecha de nacimiento inválida en calendario o futura."
     if not validators.validate_email(str(email)):
         return False, "Formato de correo electrónico no válido."
+    if sexo not in ("Hombre", "Mujer", "Sin especificar"):
+        return False, "Seleccione una opción válida para el sexo."
 
     conn = database.connect_db()
     try:
@@ -277,14 +312,19 @@ def register_new_applicant(
             if cursor.fetchone():
                 return False, "Inscripción rechazada: La persona ya posee un curso asignado."
             id_persona = existing[0]
+            if sexo != "Sin especificar":
+                cursor.execute(
+                    "UPDATE Persona SET sexo = ? WHERE id_persona = ?",
+                    (sexo, id_persona),
+                )
         else:
             cursor.execute(
                 """
-                INSERT INTO Persona (dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO Persona (dni, nombre, apellido, fecha_nac, direccion, localidad, telefono, email, sexo)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (str(dni).strip(), nombre.strip(), apellido.strip(), str(fecha_nac).strip(),
-                 direccion.strip(), localidad.strip(), telefono.strip(), str(email).strip())
+                 direccion.strip(), localidad.strip(), telefono.strip(), str(email).strip(), sexo)
             )
             id_persona = cursor.lastrowid
 
@@ -309,7 +349,11 @@ def register_new_applicant(
 
 # --- CRUD TABLA PERSONA ---
 
-def update_person(id_persona: int, dni: str, nombre: str, apellido: str, fecha_nac: str, direccion: str, localidad: str, telefono: str, email: str):
+def update_person(
+    id_persona: int, dni: str, nombre: str, apellido: str, fecha_nac: str,
+    direccion: str, localidad: str, telefono: str, email: str,
+    sexo: str = "Sin especificar",
+):
     """
     Actualiza la información de un registro guardado en la tabla Persona.
     Permite modificar cualquier campo garantizando que DNI sea único (UNIQUE)
@@ -323,6 +367,8 @@ def update_person(id_persona: int, dni: str, nombre: str, apellido: str, fecha_n
         return False, f"La persona debe tener al menos {MINIMUM_AGE} años cumplidos."
     if not validators.validate_email(str(email)):
         return False, "Formato de correo electrónico no válido."
+    if sexo not in ("Hombre", "Mujer", "Sin especificar"):
+        return False, "Seleccione una opción válida para el sexo."
     if not (validators.validate_not_empty(nombre) and validators.validate_not_empty(apellido)):
         return False, "El nombre y el apellido no pueden estar vacíos."
 
@@ -337,11 +383,11 @@ def update_person(id_persona: int, dni: str, nombre: str, apellido: str, fecha_n
         cursor.execute(
             """
             UPDATE Persona
-            SET dni = ?, nombre = ?, apellido = ?, fecha_nac = ?, direccion = ?, localidad = ?, telefono = ?, email = ?
+            SET dni = ?, nombre = ?, apellido = ?, fecha_nac = ?, direccion = ?, localidad = ?, telefono = ?, email = ?, sexo = ?
             WHERE id_persona = ?
             """,
             (str(dni).strip(), nombre.strip(), apellido.strip(), str(fecha_nac).strip(),
-             direccion.strip(), localidad.strip(), telefono.strip(), str(email).strip(), id_persona)
+             direccion.strip(), localidad.strip(), telefono.strip(), str(email).strip(), sexo, id_persona)
         )
         if cursor.rowcount == 0:
             conn.rollback()
@@ -1004,10 +1050,10 @@ def get_all_persons_with_enrollment():
     id_inscripcion, id_comision, codigo_comision, id_curso, nombre_curso, estado, fecha_inscripcion
     """
     query = """
-        SELECT p.id_persona, p.dni, p.nombre, p.apellido, p.fecha_nac, 
+        SELECT p.id_persona, p.dni, p.nombre, p.apellido, p.fecha_nac,
                p.direccion, p.localidad, p.telefono, p.email,
                i.id_inscripcion, i.id_comision, com.codigo, 
-               cur.id_curso, cur.nombre, i.estado, i.fecha_hora
+               cur.id_curso, cur.nombre, i.estado, i.fecha_hora, p.sexo
         FROM Persona p
         LEFT JOIN Inscripcion i ON p.id_persona = i.id_persona
         LEFT JOIN Comision com ON i.id_comision = com.id_comision
@@ -1032,3 +1078,57 @@ def get_dashboard_stats():
         "en_espera": en_espera,
         "personas": personas,
     }
+
+
+def get_course_statistics():
+    """Retorna inscriptos, estados y vacantes titulares agrupados por curso."""
+    return execute_query(
+        """
+        SELECT cur.nombre,
+               COALESCE(reg.inscriptos, 0),
+               COALESCE(reg.admitidos, 0),
+               COALESCE(reg.en_espera, 0),
+               COALESCE(com.comisiones, 0),
+               COALESCE(com.cupos_titulares, 0),
+               COALESCE(cur.cupo_maximo, 0),
+               COALESCE(com.cupo_comisiones, 0)
+        FROM Curso cur
+        LEFT JOIN (
+            SELECT id_curso, COUNT(*) AS comisiones,
+                   SUM(cupo_seleccion) AS cupos_titulares,
+                   SUM(cupo_total) AS cupo_comisiones
+            FROM Comision
+            GROUP BY id_curso
+        ) com ON com.id_curso = cur.id_curso
+        LEFT JOIN (
+            SELECT c.id_curso,
+                   COUNT(i.id_inscripcion) AS inscriptos,
+                   SUM(CASE WHEN i.estado = 1 THEN 1 ELSE 0 END) AS admitidos,
+                   SUM(CASE WHEN i.estado = 0 THEN 1 ELSE 0 END) AS en_espera
+            FROM Comision c
+            LEFT JOIN Inscripcion i ON i.id_comision = c.id_comision
+            GROUP BY c.id_curso
+        ) reg ON reg.id_curso = cur.id_curso
+        ORDER BY cur.nombre COLLATE NOCASE
+        """,
+        fetch=True,
+    )
+
+
+def get_gender_statistics():
+    """Retorna totales para las tres categorías estadísticas de sexo."""
+    counts = dict(
+        execute_query(
+            """
+            SELECT sexo, COUNT(*)
+            FROM Persona p
+            JOIN Inscripcion i ON i.id_persona = p.id_persona
+            GROUP BY sexo
+            """,
+            fetch=True,
+        )
+    )
+    return [
+        (category, counts.get(category, 0))
+        for category in ("Hombre", "Mujer", "Sin especificar")
+    ]

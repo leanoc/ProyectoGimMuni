@@ -93,7 +93,6 @@ class CoursesView(tk.Frame):
             bg=BG_MAIN,
             fg=TEXT_MAIN
         ).pack(side="left")
-
         lbl_desc = tk.Label(
             self,
             text="Administración de actividades, criterios de adjudicación (Sorteo / Orden de llegada), edad mínima y cupos máximos.",

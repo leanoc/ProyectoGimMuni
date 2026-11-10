@@ -35,7 +35,6 @@ class SelectionsView(tk.Frame):
             bg=BG_MAIN,
             fg=TEXT_MAIN
         ).pack(side="left")
-
         lbl_desc = tk.Label(
             self,
             text="Adjudicación de titulares por sorteo aleatorio o por orden cronológico estricto (FIFO), y supervisión de listas de admitidos y en espera.",

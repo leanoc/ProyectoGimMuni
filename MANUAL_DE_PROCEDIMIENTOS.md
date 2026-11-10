@@ -9,41 +9,13 @@
 
 El presente manual describe los procedimientos operativos para el correcto uso del **Sistema de Inscripción y Sorteo del Gimnasio Municipal**, actualizado con su **interfaz gráfica moderna de escritorio (GUI)** construida íntegramente con Python y Tkinter/ttk.
 
-El sistema permite gestionar de forma visual e intuitiva el ciclo de vida de los cursos deportivos (Natación, Gimnasia Acuática, Fútbol, Atletismo u otros), el control estricto de cupos y vacantes por comisión, el padrón general de postulantes y la adjudicación transparente de vacantes titulares (mediante Sorteo Aleatorio o por estricto Orden de Llegada FIFO) y sus respectivas Listas de Espera con promoción automática. También incluye exportación CSV configurable y notificaciones por correo.
+El sistema permite gestionar de forma visual e intuitiva el ciclo de vida de los cursos deportivos (Natación, Gimnasia Acuática, Fútbol, Atletismo u otros), el control estricto de cupos y vacantes por comisión, el padrón general de postulantes y la adjudicación transparente de vacantes titulares (mediante Sorteo Aleatorio o por estricto Orden de Llegada FIFO) y sus respectivas Listas de Espera con promoción automática. También incluye estadísticas, historial exportable a CSV/PDF, copias de seguridad y notificaciones por correo.
 
 ---
 
-## 2. Requisitos del Entorno y Puesta en Marcha
+## 2. Acceso al programa
 
-### Requisitos Técnicos
-- **Sistema Operativo:** Windows, Linux o macOS.
-- **Lenguaje:** Python 3.10 o superior (compatible con Python 3.12 y 3.13).
-- **Interfaz Gráfica:** `tkinter` y `tkinter.ttk` (incluidos de forma estándar con Python).
-- **Base de Datos:** SQLite 3 (integrada de forma nativa en Python, sin requerir instalación de servidores externos).
-- **Dependencias externas:** Ninguna. Se apoya exclusivamente en la librería estándar de Python (`tkinter`, `sqlite3`, `unittest`, `datetime`, `re`, `random`).
-
-### Puesta en Marcha
-
-1. Abra una terminal de comandos (PowerShell, CMD o Bash) en la carpeta raíz del proyecto:
-   ```bash
-   cd "g:\2026\Curso de programación\Programador\Proyecto\GimnasioMunicipal"
-   ```
-2. Ejecute la aplicación principal:
-   ```bash
-   python principal.py
-   ```
-   *La ventana se ajustará al tamaño de pantalla disponible y abrirá centrada. Si una vista, tabla o diálogo supera el espacio visible, utilice sus barras de desplazamiento para acceder al resto del contenido.*
-
-3. *(Opcional)* Carga de datos de prueba:
-   Si desea poblar rápidamente la base con datos de prueba realistas para demostración:
-   ```bash
-   python seed.py
-   ```
-
-4. Verificación de integridad con pruebas unitarias:
-   ```bash
-   python -m unittest test_gym.py
-   ```
+Cuando se distribuya la aplicación, se abrirá desde su acceso directo en el escritorio o desde el menú de programas. Este manual describe el uso de las ventanas; no hace falta ejecutar comandos ni cargar datos de prueba.
 
 ---
 
@@ -57,7 +29,8 @@ El sistema garantiza consistencia e integridad referencial en la base de datos r
    - Asociada a un curso (`id_curso`). Define el `cupo_total` (límite máximo de inscriptos permitidos en la comisión) y el `cupo_seleccion` (cupo de titulares admitidos).
    - *Regla:* El cupo de selección no puede superar al cupo total.
 3. **Tabla Persona:**
-   - Almacena DNI, nombre, apellido, fecha de nacimiento, dirección, localidad, teléfono y correo electrónico.
+   - Almacena DNI, nombre, apellido, fecha de nacimiento, sexo (opcional), dirección, localidad, teléfono y correo electrónico.
+   - El sexo puede quedar como **Sin especificar**; los registros anteriores se conservan en esa categoría, sin asignarles un valor supuesto.
    - **Restricción UNIQUE en DNI:** No se permite duplicar números de DNI en el padrón.
    - **Edad Mínima Obligatoria:** Regulada por `config.py` (por defecto 16 años).
 4. **Tabla Inscripcion:**
@@ -65,12 +38,14 @@ El sistema garantiza consistencia e integridad referencial en la base de datos r
    - `estado = 0`: Postulante en **Lista de Espera**.
    - `estado = 1`: Postulante **Titular Admitido**.
    - Claves foráneas con **ON DELETE CASCADE** para mantener la consistencia al eliminar cursos o comisiones.
+5. **Historial de movimientos:**
+   - Registra automáticamente altas, modificaciones, bajas, reasignaciones y adjudicaciones, sin copiar DNI ni otros datos personales al detalle.
 
 ---
 
 ## 4. Estructura de la Interfaz Gráfica (Navegación)
 
-La aplicación cuenta con una **Barra Lateral Izquierda (Sidebar)** de diseño oscuro profesional que permite acceder en cualquier momento a las 5 vistas funcionales:
+La aplicación cuenta con una **Barra Lateral Izquierda (Sidebar)** para acceder a las siete vistas. El botón **❔ Consultar** de la barra superior muestra instrucciones para la ventana activa.
 
 ```text
 ┌─────────────────────────────────┬───────────────────────────────────────────────────────┐
@@ -82,6 +57,8 @@ La aplicación cuenta con una **Barra Lateral Izquierda (Sidebar)** de diseño o
 │ 👥  Comisiones y Cupos          │                                                       │
 │ 📝  Personas e Inscripción      │                                                       │
 │ 🎲  Sorteos y Adjudicación      │                                                       │
+│ 🕘  Historial de Movimientos    │                                                       │
+│ 📈  Estadísticas                │                                                       │
 │ Exportar CSV                    │                                                       │
 ├─────────────────────────────────┤                                                       │
 │ Versión 3.1.0 (Tkinter)         │                                                       │
@@ -97,6 +74,8 @@ La aplicación cuenta con una **Barra Lateral Izquierda (Sidebar)** de diseño o
 
 Ofrece un resumen ejecutivo en tiempo real del estado del gimnasio y accesos directos.
 
+![Captura del panel de control](./docs/capturas/dashboard.png)
+
 #### Procedimiento:
 1. Haga clic en **📊 Dashboard / Resumen** en el menú lateral.
 2. **Tarjetas de Métricas (KPIs):** Observe los 5 indicadores actualizados:
@@ -109,14 +88,18 @@ Ofrece un resumen ejecutivo en tiempo real del estado del gimnasio y accesos dir
    - Inscribir Postulante.
    - Nuevo Curso.
    - Nueva Comisión.
-4. **Tabla de Ocupación Global:** Visualice el estado de cada comisión con sus porcentajes y barras de ocupación.
+4. **Tabla de Ocupación Global:** Visualice inscriptos, titulares, lista de espera y vacantes disponibles por comisión.
 5. Presione el botón **🔄 Actualizar Datos** en la esquina superior derecha cada vez que desee forzar un refresco general.
+
+**Consulta de esta vista:** Presione **❔ Consultar** en la barra superior para abrir las indicaciones dentro de la aplicación.
 
 ---
 
 ### Módulo 2: Cursos y Deportes (CRUD)
 
 Permite administrar la oferta deportiva del gimnasio y revisar quiénes están inscriptos en cada actividad.
+
+![Captura de cursos y deportes](./docs/capturas/courses.png)
 
 #### 2.1 Ver y Filtrar Cursos
 - Ingrese a **📚 Cursos y Deportes**.
@@ -146,11 +129,15 @@ Permite administrar la oferta deportiva del gimnasio y revisar quiénes están i
 2. Haga clic en **🗑️ Eliminar**.
 3. Confirme la advertencia. Se aplicará borrado en cascada para sus comisiones e inscripciones asociadas.
 
+**Consulta de esta vista:** Presione **❔ Consultar** en la barra superior para ver las acciones y la selección de filas.
+
 ---
 
 ### Módulo 3: Comisiones, Cupos y Vacantes
 
 Permite gestionar horarios, regular la capacidad máxima y fiscalizar la lista de espera de cada comisión.
+
+![Captura de comisiones y cupos](./docs/capturas/commissions.png)
 
 #### 3.1 Consultar Estado y Vacantes de Comisiones
 - Ingrese a **👥 Comisiones y Cupos**.
@@ -184,11 +171,15 @@ Permite gestionar horarios, regular la capacidad máxima y fiscalizar la lista d
 1. Seleccione la comisión y presione **🗑️ Eliminar**.
 2. Confirme el mensaje de diálogo para proceder con la baja.
 
+**Consulta de esta vista:** Presione **❔ Consultar** en la barra superior para ver las acciones disponibles para la comisión seleccionada.
+
 ---
 
 ### Módulo 4: Padrón de Personas e Inscripciones
 
 Permite realizar inscripciones con **control preventivo de vacantes**, actualizar legajos, reasignar comisiones y gestionar bajas con reemplazo automático.
+
+![Captura del padrón de personas](./docs/capturas/persons.png)
 
 #### 4.1 Registrar Nueva Inscripción (Verificación Preventiva de Cupos)
 Este procedimiento aplica la política *fail-fast* para no solicitar datos innecesarios si no hay lugar:
@@ -199,7 +190,7 @@ Este procedimiento aplica la política *fail-fast* para no solicitar datos innec
 3. Ingrese el **DNI**:
    - El sistema comprueba en tiempo real que el DNI cumpla el formato de 7 u 8 dígitos.
    - Si el DNI ya posee una inscripción activa, se alertará de la duplicación impidiendo avanzar.
-4. Complete los datos personales: Nombre, Apellido, Fecha de Nacimiento (`AAAA-MM-DD`), Dirección, Localidad, Teléfono y Email.
+4. Complete los datos personales: Nombre, Apellido, Fecha de Nacimiento (`AAAA-MM-DD`), Dirección, Localidad, Teléfono y Email. El campo **Sexo** es opcional: elija Hombre, Mujer o Sin especificar.
 5. El sistema calcula la edad automáticamente y valida que cumpla con la edad mínima obligatoria configurada (16 años).
 6. Al presionar **Guardar Inscripción**, se crea la persona en el padrón y se genera su inscripción formal con marca de tiempo precisa.
 
@@ -228,11 +219,15 @@ Este procedimiento aplica la política *fail-fast* para no solicitar datos innec
    - **Opción B (Eliminar completamente del sistema):** Elimina el registro personal y su inscripción de la base de datos.
 3. **Promoción de Lista de Espera:** Si la persona dada de baja era titular (`estado = 1`), el siguiente postulante en espera por orden cronológico pasa inmediatamente a ocupar la titularidad como admitido, notificando su nombre por pantalla e intentando enviarle una confirmación por correo.
 
+**Consulta de esta vista:** Presione **❔ Consultar** en la barra superior para repasar las acciones del padrón.
+
 ---
 
 ### Módulo 5: Sorteos y Adjudicación de Cupos
 
 Este módulo centraliza la asignación de vacantes titulares y la inspección general de resultados.
+
+![Captura de sorteos y adjudicación](./docs/capturas/selections.png)
 
 #### 5.1 Ejecución del Sorteo Aleatorio
 1. Ingrese a **🎲 Sorteos y Adjudicación**.
@@ -258,9 +253,41 @@ En la parte inferior de la vista se encuentra el inspector general:
   - `Solo en Lista de Espera`: Lista a los postulantes ordenados cronológicamente a la espera de una vacante.
 - Presione **🔄 Actualizar** para refrescar la consulta.
 
+**Consulta de esta vista:** Presione **❔ Consultar** en la barra superior para ver cuándo usar sorteo o FIFO y cómo filtrar los resultados.
+
 ---
 
-## 6. Exportación CSV, correos y acerca de
+### Módulo 6: Historial de Movimientos
+
+La aplicación registra automáticamente altas, modificaciones, bajas, reasignaciones y adjudicaciones de cursos, comisiones, fichas e inscripciones. El historial conserva fecha y hora y evita incluir DNI u otros datos personales.
+
+![Captura del historial](./docs/capturas/history.png)
+
+1. Abra **🕘 Historial de Movimientos** desde el menú lateral.
+2. Revise los movimientos en orden cronológico, con el más reciente arriba.
+3. Use **🔄 Actualizar** para recargar los registros.
+4. Presione **📄 Exportar CSV** o **📕 Exportar PDF** y elija el nombre y la ubicación del archivo.
+
+**Consulta de esta vista:** Presione **❔ Consultar** en la barra superior para consultar las instrucciones desde la pantalla.
+
+---
+
+### Módulo 7: Estadísticas Principales
+
+Presenta los totales del sistema, el porcentaje de ocupación de los cupos de cada curso y la distribución de las personas registradas por sexo.
+
+![Captura de estadísticas](./docs/capturas/statistics.png)
+
+1. Abra **📈 Estadísticas** desde el menú lateral.
+2. El gráfico **Ocupación de cupos** compara los lugares ocupados con los disponibles. La tabla muestra la ocupación porcentual de cada curso respecto de su capacidad efectiva: el menor valor entre el cupo máximo configurado y la suma de cupos de sus comisiones.
+3. El gráfico **Distribución de inscriptos por sexo** muestra hombres, mujeres y personas sin especificar. Cada porcentaje se calcula sobre el total de inscriptos; los registros anteriores aparecen como **Sin especificar**.
+4. Presione **🔄 Actualizar** para consultar datos recientes.
+
+**Consulta de esta vista:** Presione **❔ Consultar** en la barra superior para ver el significado de los indicadores.
+
+---
+
+## 8. Exportaciones, copias de seguridad, correos y acerca de
 
 ### Exportar tablas
 1. Presione **Exportar CSV** en la barra superior.
@@ -269,6 +296,16 @@ En la parte inferior de la vista se encuentra el inspector general:
 4. Se generan `cursos.csv`, `comisiones.csv`, `personas.csv` o `inscripciones.csv`, según la selección.
 
 La tabla Personas contiene datos personales. Proteja los archivos y compártalos solo con personas autorizadas.
+
+### Exportar historial
+En **🕘 Historial de Movimientos**, use los botones **📄 Exportar CSV** o **📕 Exportar PDF**. El archivo incluye la fecha, la sección, el tipo de movimiento y su detalle.
+
+### Crear una copia de seguridad
+1. Presione **Crear copia de seguridad** en la barra superior.
+2. Elija la carpeta y el nombre del archivo `.db`.
+3. Espere el aviso de confirmación antes de cerrar la aplicación o mover el archivo.
+
+La copia contiene la base de datos completa, incluido el historial. Guárdela en un lugar seguro y compruebe periódicamente que puede abrirse. Para restaurarla, cierre la aplicación y reemplace `system.db` por una copia válida; conserve antes otra copia del archivo actual.
 
 ### Notificaciones por correo (`mailto`)
 El sistema utiliza el protocolo estándar `mailto:` para abrir automáticamente la aplicación de correo predeterminada del sistema operativo (por ejemplo Outlook, Thunderbird o webmail predeterminado) con el destinatario, asunto y plantilla del mensaje precargados.
@@ -282,7 +319,7 @@ El botón **Acerca de...**, al pie de la barra lateral, informa el contexto educ
 
 ---
 
-## 7. Matriz de Manejo de Errores y Excepciones
+## 9. Matriz de Manejo de Errores y Excepciones
 
 | Situación Detectada | Comportamiento del Sistema en la GUI | Acción Sugerida |
 | :--- | :--- | :--- |
@@ -294,11 +331,6 @@ El botón **Acerca de...**, al pie de la barra lateral, informa el contexto educ
 
 ---
 
-## 8. Verificación de Integridad mediante Pruebas Automatizadas
+## 10. Acceso directo
 
-Las pruebas unitarias de `test_gym.py` validan reglas de negocio, operaciones de base de datos, exportación y reemplazos automáticos sin tocar la base real de producción (`system.db`).
-
-Para correrlas en cualquier momento:
-```bash
-python -m unittest test_gym.py
-```
+Cuando se distribuya la aplicación instalada, se iniciará desde el acceso directo creado en el escritorio o desde el menú de programas. No se requiere abrir una terminal.

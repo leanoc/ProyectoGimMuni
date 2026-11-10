@@ -5,7 +5,9 @@ Desarrollado por: L. M. OCARIZ ARRIETA
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+import sqlite3
+from datetime import datetime
+from tkinter import filedialog, ttk, messagebox
 import database
 import operations
 from config import APP_TITLE, APP_VERSION, APP_DEVELOPER
@@ -21,6 +23,8 @@ from gui.views.courses_view import CoursesView
 from gui.views.commissions_view import CommissionsView
 from gui.views.persons_view import PersonsView
 from gui.views.selections_view import SelectionsView
+from gui.views.history_view import HistoryView
+from gui.views.statistics_view import StatisticsView
 from gui.components.dialogs import ExportCsvDialog
 
 class GymApp(tk.Tk):
@@ -47,6 +51,8 @@ class GymApp(tk.Tk):
             "commissions": CommissionsView(self.content_area, self),
             "persons": PersonsView(self.content_area, self),
             "selections": SelectionsView(self.content_area, self),
+            "history": HistoryView(self.content_area, self),
+            "statistics": StatisticsView(self.content_area, self),
         }
 
         # Iniciar en Dashboard
@@ -99,6 +105,8 @@ class GymApp(tk.Tk):
             ("commissions", "👥  Comisiones y Cupos"),
             ("persons", "📝  Personas e Inscripción"),
             ("selections", "🎲  Sorteos y Adjudicación"),
+            ("history", "🕘  Historial de Movimientos"),
+            ("statistics", "📈  Estadísticas"),
         ]
 
         for view_key, label_text in nav_items:
@@ -190,13 +198,23 @@ class GymApp(tk.Tk):
             text="Exportar CSV",
             command=self.open_export_dialog,
         ).pack(side="right", padx=(8, 0), pady=10)
+        ttk.Button(
+            top_bar,
+            text="❔ Consultar",
+            command=self.show_current_help,
+        ).pack(side="right", padx=(8, 0), pady=10)
+        ttk.Button(
+            top_bar,
+            text="Crear copia de seguridad",
+            command=self.create_backup,
+        ).pack(side="right", padx=(8, 0), pady=10)
 
         # Badge de estado del sistema
         badge_frame = tk.Frame(top_bar, bg="#ECFDF5", padx=10, pady=4)
         badge_frame.pack(side="right", pady=12)
         tk.Label(
             badge_frame,
-            text="● Sistema Operativo y Conectado",
+            text="● Sistema activo",
             font=FONT_SMALL,
             bg="#ECFDF5",
             fg=COLOR_SUCCESS
@@ -250,8 +268,7 @@ class GymApp(tk.Tk):
                 "Programación dictado durante 2026 en el CFP N.º 402 de Berisso.\n\n"
                 "Aplicación académica para gestionar cursos, inscripciones, "
                 "comisiones y adjudicación de vacantes.\n\n"
-                f"Desarrollo: {APP_DEVELOPER}\n"
-                "Tecnologías: Python, Tkinter y SQLite."
+                f"Desarrollo: {APP_DEVELOPER}"
             ),
             parent=self,
         )
@@ -304,9 +321,52 @@ class GymApp(tk.Tk):
             "courses": "Gestión y Oferta de Cursos",
             "commissions": "Comisiones, Cupos y Vacantes",
             "persons": "Padrón de Personas e Inscripciones",
-            "selections": "Sorteos y Adjudicación de Cupos"
+            "selections": "Sorteos y Adjudicación de Cupos",
+            "history": "Historial de Movimientos",
+            "statistics": "Estadísticas Principales",
         }
         self.lbl_top_title.config(text=f"Gimnasio Municipal  ›  {titles.get(view_name, '')}")
+
+    def show_help(self, view_name: str) -> None:
+        """Muestra instrucciones breves para la pantalla seleccionada."""
+        instructions = {
+            "dashboard": "Consulte los indicadores y la ocupación por comisión. Use Actualizar Datos para recargar.",
+            "courses": "Busque cursos por nombre o criterio. Seleccione una fila para modificarla, eliminarla o consultar sus inscriptos; use Nuevo Curso para crear uno.",
+            "commissions": "Busque por código o curso. Seleccione una comisión para cambiar cupos, eliminarla o revisar su lista de espera.",
+            "persons": "Busque por DNI, nombre o apellido. Seleccione una persona para modificar sus datos, cambiarla de comisión o darla de baja.",
+            "selections": "Ejecute sorteo para cursos con ese criterio o asignación FIFO para los de orden de llegada. Filtre los resultados por curso y estado.",
+            "history": "Consulte los movimientos registrados automáticamente. Use Exportar CSV o Exportar PDF para guardar una copia del historial.",
+            "statistics": "Consulte la ocupación porcentual por curso y los gráficos de ocupación y distribución por sexo. Las fichas anteriores sin ese dato se cuentan como Sin especificar.",
+        }
+        messagebox.showinfo(
+            f"Consulta - {self.lbl_top_title.cget('text')}",
+            instructions[view_name],
+            parent=self,
+        )
+
+    def show_current_help(self) -> None:
+        """Abre la consulta correspondiente a la vista activa."""
+        if self.current_view_name is None:
+            raise RuntimeError("No hay una vista activa para consultar.")
+        self.show_help(self.current_view_name)
+
+    def create_backup(self) -> None:
+        """Guarda una copia consistente de la base de datos en la ruta elegida."""
+        path = filedialog.asksaveasfilename(
+            parent=self,
+            title="Guardar copia de seguridad",
+            defaultextension=".db",
+            filetypes=[("Base de datos SQLite", "*.db"), ("Todos los archivos", "*.*")],
+            initialfile=f"respaldo_gimnasio_{datetime.now():%Y%m%d_%H%M%S}.db",
+        )
+        if not path:
+            return
+        try:
+            operations.backup_database(path)
+        except (OSError, sqlite3.Error, ValueError) as error:
+            messagebox.showerror("Error al crear la copia", str(error), parent=self)
+            return
+        messagebox.showinfo("Copia creada", f"La copia de seguridad se guardó en:\n{path}", parent=self)
 
     def refresh_all_views(self):
         """Actualiza la vista actual y el dashboard si fuera necesario."""

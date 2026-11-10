@@ -39,7 +39,11 @@ El sistema incluye una interfaz gráfica moderna estructurada con barra lateral 
 - **Módulo de Sorteos y Adjudicación:**
   - Paneles diferenciados para **Sorteo Aleatorio** y **Orden de Llegada (FIFO)** con confirmación previa y reporte detallado de adjudicados.
   - Inspector de resultados con filtro de condición (Titulares admitidos / En lista de espera).
+- **Historial de movimientos:** registro automático de altas, modificaciones, bajas, reasignaciones y adjudicaciones, exportable a CSV y PDF.
+- **Estadísticas principales:** totales generales, ocupación porcentual por curso y gráficos de torta de ocupación y distribución por sexo.
+- **Copias de seguridad:** creación de un respaldo consistente de la base de datos desde la interfaz.
 - **Exportación CSV:** selección de tablas y columnas con generación de un archivo por tabla en la carpeta elegida.
+- **Consulta en pantalla:** instrucciones contextuales para cada vista y manual con capturas actuales.
 - **Notificaciones por correo:** aviso al inscribirse y al ser confirmado como titular, incluso por reemplazo de una baja.
 - **Acerca de:** contexto educativo del proyecto y versión actual.
 
@@ -109,9 +113,12 @@ GimnasioMunicipal/
 │       ├── courses_view.py      # Vista de gestión de cursos (CRUD)
 │       ├── commissions_view.py  # Vista de comisiones y vacantes
 │       ├── persons_view.py      # Vista de padrón de personas e inscripciones
-│       └── selections_view.py   # Vista de sorteos y adjudicaciones
+│       ├── selections_view.py   # Vista de sorteos y adjudicaciones
+│       ├── history_view.py      # Historial y exportaciones PDF/CSV
+│       └── statistics_view.py   # Indicadores generales y por curso
 ├── principal.py                 # Punto de entrada de la aplicación
 ├── operations.py                # Lógica de negocio, consultas SQL y operaciones
+├── reports.py                   # Exportación PDF/CSV del historial
 ├── notifications.py             # Apertura vía mailto del cliente de correo predeterminado
 ├── database.py                  # Conexión y esquema relacional SQLite
 ├── validators.py                # Validadores de entrada (DNI, fechas, emails, etc.)
@@ -120,6 +127,7 @@ GimnasioMunicipal/
 ├── test_gui_layout.py           # Pruebas de adaptación geométrica de ventanas
 ├── seed.py                      # Script auxiliar de población de datos
 ├── MANUAL_DE_PROCEDIMIENTOS.md  # Manual operativo paso a paso
+├── docs/capturas/               # Capturas de las siete vistas de la aplicación
 ├── CHANGELOG.md                 # Historial de versiones y funcionalidades
 └── ErroresEncontrados.md        # Registro histórico de mejoras y requerimientos
 ```

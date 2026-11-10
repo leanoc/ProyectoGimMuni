@@ -48,7 +48,6 @@ class PersonsView(tk.Frame):
             bg=BG_MAIN,
             fg=TEXT_MAIN
         ).pack(side="left")
-
         lbl_desc = tk.Label(
             self,
             text="Altas con control previo de cupos, edición de datos personales, reasignación de comisiones y bajas con reemplazo automático.",
